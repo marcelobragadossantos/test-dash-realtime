@@ -3,6 +3,7 @@ export interface Venda {
   loja: string;
   total_quantidade: number;
   venda_total: number;
+  numero_vendas: number;
 }
 
 export interface VendasResponse {

@@ -100,11 +100,19 @@ export function VendasList({ vendas, isLoading }: VendasListProps) {
             </div>
 
             <div className="mt-3 pt-3 border-t border-gray-100">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-gray-500">Ticket Médio</span>
-                <span className="font-semibold text-gray-700">
-                  {formatCurrency(venda.venda_total / venda.total_quantidade)}
-                </span>
+              <div className="grid grid-cols-2 gap-4 text-xs">
+                <div className="flex flex-col">
+                  <span className="text-gray-500 mb-1">Nº Clientes</span>
+                  <span className="font-semibold text-gray-700">
+                    {formatNumber(venda.numero_vendas)}
+                  </span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-gray-500 mb-1">Ticket Médio</span>
+                  <span className="font-semibold text-gray-700">
+                    {formatCurrency(venda.venda_total / venda.numero_vendas)}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
