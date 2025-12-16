@@ -110,7 +110,7 @@ export function VendasList({ vendas, isLoading }: VendasListProps) {
         </div>
       </div>
 
-      {sortedVendas.length === 0 ? (
+      {filteredVendas.length === 0 ? (
         <div className="bg-white rounded-lg shadow-md p-8 text-center">
           <Search className="w-12 h-12 text-gray-300 mx-auto mb-3" />
           <p className="text-gray-500">Nenhuma loja encontrada com "{searchTerm}"</p>
