@@ -32,13 +32,15 @@ export function VendasList({ vendas, isLoading }: VendasListProps) {
     const term = searchTerm.toLowerCase();
     const codigo = venda.codigo.toLowerCase();
     const loja = venda.loja.toLowerCase();
-    const regional = venda.regional?.toLowerCase() || '';
+    const regional = venda.regional.toLowerCase();
 
     return codigo.includes(term) || loja.includes(term) || regional.includes(term);
   });
 
   const totalVendas = filteredVendas.reduce((acc, venda) => acc + venda.venda_total, 0);
   const totalQuantidade = filteredVendas.reduce((acc, venda) => acc + venda.total_quantidade, 0);
+  const totalClientes = filteredVendas.reduce((acc, venda) => acc + venda.numero_vendas, 0);
+  const ticketMedio = totalClientes > 0 ? totalVendas / totalClientes : 0;
 
   if (isLoading) {
     return (
@@ -98,7 +100,11 @@ export function VendasList({ vendas, isLoading }: VendasListProps) {
             <TrendingUp className="w-5 h-5" />
             <span className="text-sm font-medium opacity-90">Total Vendas</span>
           </div>
-          <p className="text-2xl font-bold">{formatCurrency(totalVendas)}</p>
+          <p className="text-2xl font-bold mb-3">{formatCurrency(totalVendas)}</p>
+          <div className="pt-2 border-t border-white/20">
+            <p className="text-xs opacity-75">Nº Clientes</p>
+            <p className="text-sm font-semibold">{formatNumber(totalClientes)}</p>
+          </div>
         </div>
 
         <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-lg shadow-md p-4 text-white">
@@ -106,7 +112,11 @@ export function VendasList({ vendas, isLoading }: VendasListProps) {
             <Package className="w-5 h-5" />
             <span className="text-sm font-medium opacity-90">Quantidade</span>
           </div>
-          <p className="text-2xl font-bold">{formatNumber(totalQuantidade)}</p>
+          <p className="text-2xl font-bold mb-3">{formatNumber(totalQuantidade)}</p>
+          <div className="pt-2 border-t border-white/20">
+            <p className="text-xs opacity-75">Ticket Médio</p>
+            <p className="text-sm font-semibold">{formatCurrency(ticketMedio)}</p>
+          </div>
         </div>
       </div>
 
@@ -135,7 +145,7 @@ export function VendasList({ vendas, isLoading }: VendasListProps) {
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-900">{venda.loja}</h3>
-                  <p className="text-xs text-gray-500">Código: {venda.codigo}</p>
+                  <p className="text-xs text-gray-500">Código: {venda.codigo} • {venda.regional}</p>
                 </div>
               </div>
             </div>
