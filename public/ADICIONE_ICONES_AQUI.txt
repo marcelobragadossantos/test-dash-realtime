@@ -1,0 +1,15 @@
+IMPORTANTE: Adicione os ícones neste diretório!
+
+Você precisa adicionar:
+1. icon-192.png (192x192 pixels)
+2. icon-512.png (512x512 pixels)
+
+Use a imagem do sales icon que você forneceu e redimensione para esses tamanhos.
+
+Ferramentas recomendadas:
+- https://www.pwabuilder.com/imageGenerator (online, grátis)
+- https://favicon.io/favicon-converter/ (online, grátis)
+- ImageMagick (linha de comando)
+- Photoshop/GIMP/Figma (editores gráficos)
+
+Consulte ICONES_PWA.md na raiz do projeto para instruções detalhadas.
