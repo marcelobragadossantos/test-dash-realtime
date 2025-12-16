@@ -1,6 +1,7 @@
 import { VendasResponse, VendasParams } from '../types/api';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+// Remove barra final da URL se existir
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '');
 const API_SECRET_KEY = import.meta.env.VITE_API_SECRET_KEY;
 
 if (!API_BASE_URL) {
