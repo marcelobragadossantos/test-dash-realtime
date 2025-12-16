@@ -20,8 +20,13 @@ export function VendasList({ vendas, isLoading }: VendasListProps) {
     return new Intl.NumberFormat('pt-BR').format(value);
   };
 
-  // Filtrar vendas baseado no termo de pesquisa
-  const filteredVendas = vendas.filter((venda) => {
+  // Primeiro ordena todas as vendas e adiciona o ranking original
+  const vendasComRanking = [...vendas]
+    .sort((a, b) => b.venda_total - a.venda_total)
+    .map((venda, index) => ({ ...venda, ranking: index + 1 }));
+
+  // Depois filtra mantendo o ranking original
+  const filteredVendas = vendasComRanking.filter((venda) => {
     if (!searchTerm) return true;
 
     const term = searchTerm.toLowerCase();
@@ -31,8 +36,6 @@ export function VendasList({ vendas, isLoading }: VendasListProps) {
 
     return codigo.includes(term) || loja.includes(term) || regional.includes(term);
   });
-
-  const sortedVendas = [...filteredVendas].sort((a, b) => b.venda_total - a.venda_total);
 
   const totalVendas = filteredVendas.reduce((acc, venda) => acc + venda.venda_total, 0);
   const totalQuantidade = filteredVendas.reduce((acc, venda) => acc + venda.total_quantidade, 0);
@@ -120,7 +123,7 @@ export function VendasList({ vendas, isLoading }: VendasListProps) {
         </div>
       ) : (
         <div className="space-y-3">
-          {sortedVendas.map((venda, index) => (
+          {filteredVendas.map((venda) => (
           <div
             key={venda.codigo}
             className="bg-white rounded-lg shadow-md p-4 hover:shadow-lg transition-shadow"
@@ -128,7 +131,7 @@ export function VendasList({ vendas, isLoading }: VendasListProps) {
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-start gap-3">
                 <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary-100 text-primary-700 font-bold text-sm">
-                  {index + 1}
+                  {venda.ranking}
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-900">{venda.loja}</h3>
