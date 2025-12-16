@@ -4,7 +4,7 @@ export interface Venda {
   total_quantidade: number;
   venda_total: number;
   numero_vendas: number;
-  regional?: string; // Campo futuro, ainda não disponível na API
+  regional: string;
 }
 
 export interface VendasResponse {
