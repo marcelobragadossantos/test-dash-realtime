@@ -6,8 +6,10 @@ Configure as seguintes variáveis de ambiente no painel do Easypanel:
 
 ### 1. VITE_API_BASE_URL
 - **Descrição**: URL base da sua API
-- **Formato**: URL completa sem barra no final
-- **Exemplo**: `https://sua-url-easypanel.com`
+- **Formato**: URL completa **SEM barra no final**
+- **Exemplo correto**: `https://toolls-api-realtime.m9tcix.easypanel.host`
+- **Exemplo incorreto**: ~~`https://toolls-api-realtime.m9tcix.easypanel.host/`~~ (com barra)
+- ⚠️ **Importante**: A barra final será removida automaticamente pelo código, mas é melhor configurar sem ela
 
 ### 2. VITE_API_SECRET_KEY
 - **Descrição**: Chave secreta para autenticação
@@ -44,6 +46,20 @@ Configure as seguintes variáveis de ambiente no painel do Easypanel:
 4. Salve as configurações
 5. Faça o redeploy da aplicação
 
+## ⚠️ Erro de CORS
+
+Se você ver erros de CORS no console do navegador, significa que o **backend** precisa ser configurado para aceitar requisições do frontend.
+
+**Consulte o arquivo [CORS_FIX.md](./CORS_FIX.md) para instruções detalhadas de como resolver.**
+
+Resumo rápido:
+- O backend precisa ter CORS habilitado
+- Deve permitir a origem do frontend (ex: `https://seu-frontend.easypanel.host`)
+- Deve permitir o header `X-Secret-Key`
+
 ## Verificação
 
-Após configurar, a aplicação deve carregar os dados automaticamente ao iniciar.
+Após configurar:
+1. As variáveis de ambiente devem estar corretas
+2. O backend deve ter CORS configurado
+3. A aplicação deve carregar os dados automaticamente ao iniciar ✅
