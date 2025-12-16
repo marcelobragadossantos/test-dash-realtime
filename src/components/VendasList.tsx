@@ -1,4 +1,5 @@
-import { Store, TrendingUp, Package } from 'lucide-react';
+import { useState } from 'react';
+import { Store, TrendingUp, Package, Search } from 'lucide-react';
 import { Venda } from '../types/api';
 
 interface VendasListProps {
@@ -7,6 +8,7 @@ interface VendasListProps {
 }
 
 export function VendasList({ vendas, isLoading }: VendasListProps) {
+  const [searchTerm, setSearchTerm] = useState('');
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -18,10 +20,22 @@ export function VendasList({ vendas, isLoading }: VendasListProps) {
     return new Intl.NumberFormat('pt-BR').format(value);
   };
 
-  const sortedVendas = [...vendas].sort((a, b) => b.venda_total - a.venda_total);
+  // Filtrar vendas baseado no termo de pesquisa
+  const filteredVendas = vendas.filter((venda) => {
+    if (!searchTerm) return true;
 
-  const totalVendas = vendas.reduce((acc, venda) => acc + venda.venda_total, 0);
-  const totalQuantidade = vendas.reduce((acc, venda) => acc + venda.total_quantidade, 0);
+    const term = searchTerm.toLowerCase();
+    const codigo = venda.codigo.toLowerCase();
+    const loja = venda.loja.toLowerCase();
+    const regional = venda.regional?.toLowerCase() || '';
+
+    return codigo.includes(term) || loja.includes(term) || regional.includes(term);
+  });
+
+  const sortedVendas = [...filteredVendas].sort((a, b) => b.venda_total - a.venda_total);
+
+  const totalVendas = filteredVendas.reduce((acc, venda) => acc + venda.venda_total, 0);
+  const totalQuantidade = filteredVendas.reduce((acc, venda) => acc + venda.total_quantidade, 0);
 
   if (isLoading) {
     return (
@@ -48,6 +62,33 @@ export function VendasList({ vendas, isLoading }: VendasListProps) {
 
   return (
     <div className="space-y-4">
+      {/* Campo de Pesquisa */}
+      <div className="bg-white rounded-lg shadow-md p-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Buscar por código, loja ou regional..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm('')}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+        {searchTerm && (
+          <p className="mt-2 text-sm text-gray-500">
+            {filteredVendas.length} {filteredVendas.length === 1 ? 'loja encontrada' : 'lojas encontradas'}
+          </p>
+        )}
+      </div>
+
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-gradient-to-br from-primary-500 to-primary-600 rounded-lg shadow-md p-4 text-white">
           <div className="flex items-center gap-2 mb-2">
@@ -66,8 +107,20 @@ export function VendasList({ vendas, isLoading }: VendasListProps) {
         </div>
       </div>
 
-      <div className="space-y-3">
-        {sortedVendas.map((venda, index) => (
+      {sortedVendas.length === 0 ? (
+        <div className="bg-white rounded-lg shadow-md p-8 text-center">
+          <Search className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+          <p className="text-gray-500">Nenhuma loja encontrada com "{searchTerm}"</p>
+          <button
+            onClick={() => setSearchTerm('')}
+            className="mt-3 text-primary-600 hover:text-primary-700 font-medium text-sm"
+          >
+            Limpar pesquisa
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {sortedVendas.map((venda, index) => (
           <div
             key={venda.codigo}
             className="bg-white rounded-lg shadow-md p-4 hover:shadow-lg transition-shadow"
@@ -117,7 +170,8 @@ export function VendasList({ vendas, isLoading }: VendasListProps) {
             </div>
           </div>
         ))}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
