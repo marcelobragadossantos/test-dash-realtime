@@ -148,23 +148,23 @@ export function VendasList({ vendas, isLoading }: VendasListProps) {
             className="bg-white rounded-lg shadow-md p-4 hover:shadow-lg transition-shadow"
           >
             <div className="flex items-start justify-between mb-3">
-              <div className="flex items-start gap-3">
+              <div className="flex items-start gap-3 flex-1">
                 <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary-100 text-primary-700 font-bold text-sm">
                   {venda.ranking}
                 </div>
-                <div>
+                <div className="flex-1">
                   <h3 className="font-semibold text-gray-900">{venda.loja}</h3>
-                  <p className="text-xs text-gray-500">Código: {venda.codigo} • {venda.regional}</p>
+                  <p className="text-[10px] sm:text-xs text-gray-500">
+                    Código: {venda.codigo} • {venda.regional} •{' '}
+                    <span className={`${
+                      isTempoMaiorQue1h(venda.tempo_ultimo_envio)
+                        ? 'text-red-600 font-bold'
+                        : ''
+                    }`}>
+                      {venda.tempo_ultimo_envio}
+                    </span>
+                  </p>
                 </div>
-              </div>
-              <div className="text-right">
-                <p className={`text-xs ${
-                  isTempoMaiorQue1h(venda.tempo_ultimo_envio)
-                    ? 'text-red-600 font-bold'
-                    : 'text-gray-500'
-                }`}>
-                  {venda.tempo_ultimo_envio}
-                </p>
               </div>
             </div>
 
