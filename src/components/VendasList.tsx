@@ -20,6 +20,15 @@ export function VendasList({ vendas, isLoading }: VendasListProps) {
     return new Intl.NumberFormat('pt-BR').format(value);
   };
 
+  // Verifica se o tempo é maior que 1h (formato: XXd XXh XXm XXs)
+  const isTempoMaiorQue1h = (tempo: string): boolean => {
+    const match = tempo.match(/(\d+)d\s*(\d+)h/);
+    if (!match) return false;
+    const dias = parseInt(match[1]);
+    const horas = parseInt(match[2]);
+    return dias > 0 || horas >= 1;
+  };
+
   // Primeiro ordena todas as vendas e adiciona o ranking original
   const vendasComRanking = [...vendas]
     .sort((a, b) => b.venda_total - a.venda_total)
@@ -149,7 +158,13 @@ export function VendasList({ vendas, isLoading }: VendasListProps) {
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-xs text-gray-500">{venda.tempo_ultimo_envio}</p>
+                <p className={`text-xs ${
+                  isTempoMaiorQue1h(venda.tempo_ultimo_envio)
+                    ? 'text-red-600 font-bold'
+                    : 'text-gray-500'
+                }`}>
+                  {venda.tempo_ultimo_envio}
+                </p>
               </div>
             </div>
 
