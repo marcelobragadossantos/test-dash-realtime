@@ -5,6 +5,7 @@ export interface Venda {
   venda_total: number;
   numero_vendas: number;
   regional: string;
+  tempo_ultimo_envio: string;
 }
 
 export interface VendasResponse {

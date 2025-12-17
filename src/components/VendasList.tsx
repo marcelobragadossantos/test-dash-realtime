@@ -148,6 +148,9 @@ export function VendasList({ vendas, isLoading }: VendasListProps) {
                   <p className="text-xs text-gray-500">Código: {venda.codigo} • {venda.regional}</p>
                 </div>
               </div>
+              <div className="text-right">
+                <p className="text-xs text-gray-500">{venda.tempo_ultimo_envio}</p>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4 pt-3 border-t border-gray-100">
