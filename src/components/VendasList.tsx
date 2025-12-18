@@ -2,12 +2,17 @@ import { useState } from 'react';
 import { Store, TrendingUp, Package, Search } from 'lucide-react';
 import { Venda } from '../types/api';
 
+type SortField = 'venda_total' | 'total_quantidade' | 'numero_vendas' | 'ticket_medio';
+type SortOrder = 'asc' | 'desc';
+
 interface VendasListProps {
   vendas: Venda[];
   isLoading?: boolean;
+  sortField: SortField;
+  sortOrder: SortOrder;
 }
 
-export function VendasList({ vendas, isLoading }: VendasListProps) {
+export function VendasList({ vendas, isLoading, sortField, sortOrder }: VendasListProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -31,7 +36,20 @@ export function VendasList({ vendas, isLoading }: VendasListProps) {
 
   // Primeiro ordena todas as vendas e adiciona o ranking original
   const vendasComRanking = [...vendas]
-    .sort((a, b) => b.venda_total - a.venda_total)
+    .sort((a, b) => {
+      let valueA: number;
+      let valueB: number;
+
+      if (sortField === 'ticket_medio') {
+        valueA = a.numero_vendas > 0 ? a.venda_total / a.numero_vendas : 0;
+        valueB = b.numero_vendas > 0 ? b.venda_total / b.numero_vendas : 0;
+      } else {
+        valueA = a[sortField];
+        valueB = b[sortField];
+      }
+
+      return sortOrder === 'desc' ? valueB - valueA : valueA - valueB;
+    })
     .map((venda, index) => ({ ...venda, ranking: index + 1 }));
 
   // Depois filtra mantendo o ranking original
