@@ -73,7 +73,7 @@ export function Dashboard() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-white">Dashboard de Vendas</h1>
-              <p className="text-primary-100 text-sm mt-1">{getSortDescription()}</p>
+              <p className="text-primary-100 text-xs mt-1">{getSortDescription()}</p>
             </div>
             <div className="flex items-center gap-2">
               <div className="relative" ref={sortMenuRef}>
