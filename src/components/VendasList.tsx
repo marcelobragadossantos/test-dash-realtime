@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Store, TrendingUp, Package, Search } from 'lucide-react';
 import { Venda } from '../types/api';
 
-type SortField = 'venda_total' | 'total_quantidade' | 'numero_vendas' | 'ticket_medio';
+type SortField = 'venda_total' | 'total_quantidade' | 'numero_vendas' | 'ticket_medio' | 'cmv';
 type SortOrder = 'asc' | 'desc';
 
 interface VendasListProps {
@@ -55,6 +55,9 @@ export function VendasList({ vendas, isLoading, sortField, sortOrder }: VendasLi
       if (sortField === 'ticket_medio') {
         valueA = a.numero_vendas > 0 ? a.venda_total / a.numero_vendas : 0;
         valueB = b.numero_vendas > 0 ? b.venda_total / b.numero_vendas : 0;
+      } else if (sortField === 'cmv') {
+        valueA = a.venda_total > 0 ? (a.custo / a.venda_total) * 100 : 0;
+        valueB = b.venda_total > 0 ? (b.custo / b.venda_total) * 100 : 0;
       } else {
         valueA = a[sortField];
         valueB = b[sortField];
@@ -79,7 +82,9 @@ export function VendasList({ vendas, isLoading, sortField, sortOrder }: VendasLi
   const totalVendas = filteredVendas.reduce((acc, venda) => acc + venda.venda_total, 0);
   const totalQuantidade = filteredVendas.reduce((acc, venda) => acc + venda.total_quantidade, 0);
   const totalClientes = filteredVendas.reduce((acc, venda) => acc + venda.numero_vendas, 0);
+  const totalCusto = filteredVendas.reduce((acc, venda) => acc + venda.custo, 0);
   const ticketMedio = totalClientes > 0 ? totalVendas / totalClientes : 0;
+  const cmvPercentual = totalVendas > 0 ? (totalCusto / totalVendas) * 100 : 0;
 
   if (isLoading) {
     return (
@@ -140,9 +145,15 @@ export function VendasList({ vendas, isLoading, sortField, sortOrder }: VendasLi
             <span className="text-sm font-medium opacity-90">Total Vendas</span>
           </div>
           <p className="text-2xl font-bold mb-3">{formatCurrency(totalVendas)}</p>
-          <div className="pt-2 border-t border-white/20">
-            <p className="text-xs opacity-75">Nº Clientes</p>
-            <p className="text-sm font-semibold">{formatNumber(totalClientes)}</p>
+          <div className="pt-2 border-t border-white/20 flex items-center justify-between">
+            <div>
+              <p className="text-xs opacity-75">Nº Clientes</p>
+              <p className="text-sm font-semibold">{formatNumber(totalClientes)}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs opacity-75">%CMV</p>
+              <p className="text-sm font-semibold">{cmvPercentual.toFixed(1)}%</p>
+            </div>
           </div>
         </div>
 
@@ -214,11 +225,17 @@ export function VendasList({ vendas, isLoading, sortField, sortOrder }: VendasLi
             </div>
 
             <div className="mt-3 pt-3 border-t border-gray-100">
-              <div className="grid grid-cols-2 gap-4 text-xs">
+              <div className="grid grid-cols-3 gap-4 text-xs">
                 <div className="flex flex-col">
                   <span className="text-gray-500 mb-1">Nº Clientes</span>
                   <span className="font-semibold text-gray-700">
                     {formatNumber(venda.numero_vendas)}
+                  </span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-gray-500 mb-1">%CMV</span>
+                  <span className="font-semibold text-gray-700">
+                    {((venda.custo / venda.venda_total) * 100).toFixed(1)}%
                   </span>
                 </div>
                 <div className="flex flex-col">

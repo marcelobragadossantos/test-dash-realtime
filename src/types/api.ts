@@ -6,6 +6,7 @@ export interface Venda {
   numero_vendas: number;
   regional: string;
   tempo_ultimo_envio: string;
+  custo: number;
 }
 
 export interface VendasResponse {
