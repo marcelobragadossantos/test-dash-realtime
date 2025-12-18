@@ -47,6 +47,19 @@ export function Dashboard() {
     }
   };
 
+  const getSortDescription = () => {
+    const fieldNames: Record<SortField, string> = {
+      venda_total: 'Total Vendas',
+      total_quantidade: 'Quantidade',
+      numero_vendas: 'Nº Clientes',
+      ticket_medio: 'Ticket Médio',
+      cmv: '%CMV'
+    };
+
+    const direction = sortOrder === 'desc' ? 'Maior→Menor' : 'Menor→Maior';
+    return `Ordenação: ${fieldNames[sortField]} (${direction})`;
+  };
+
   const { data, isLoading, error, refetch, isFetching } = useVendas(getParams());
 
   useEffect(() => {
@@ -60,7 +73,7 @@ export function Dashboard() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-white">Dashboard de Vendas</h1>
-              <p className="text-primary-100 text-sm mt-1">Real Time</p>
+              <p className="text-primary-100 text-sm mt-1">{getSortDescription()}</p>
             </div>
             <div className="flex items-center gap-2">
               <div className="relative" ref={sortMenuRef}>
