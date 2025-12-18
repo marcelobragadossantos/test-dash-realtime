@@ -1,14 +1,20 @@
 import { useState, useEffect } from 'react';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
-import { RefreshCw, AlertCircle } from 'lucide-react';
+import { RefreshCw, AlertCircle, ArrowUpDown } from 'lucide-react';
 import { DateNavigator } from './DateNavigator';
 import { VendasList } from './VendasList';
 import { useVendas } from '../hooks/useVendas';
 import { ViewMode } from '../types/api';
 
+type SortField = 'venda_total' | 'total_quantidade' | 'numero_vendas' | 'ticket_medio';
+type SortOrder = 'asc' | 'desc';
+
 export function Dashboard() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>('day');
+  const [sortField, setSortField] = useState<SortField>('venda_total');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+  const [showSortMenu, setShowSortMenu] = useState(false);
 
   const getParams = () => {
     if (viewMode === 'day') {
@@ -38,15 +44,80 @@ export function Dashboard() {
               <h1 className="text-2xl font-bold text-white">Dashboard de Vendas</h1>
               <p className="text-primary-100 text-sm mt-1">Real Time</p>
             </div>
-            <button
-              onClick={() => refetch()}
-              disabled={isFetching}
-              className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-colors disabled:opacity-50"
-              aria-label="Atualizar dados"
-            >
-              <RefreshCw className={`w-5 h-5 ${isFetching ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">Atualizar</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <button
+                  onClick={() => setShowSortMenu(!showSortMenu)}
+                  className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-colors"
+                  aria-label="Ordenar"
+                >
+                  <ArrowUpDown className="w-5 h-5" />
+                  <span className="hidden sm:inline">Ordenar</span>
+                </button>
+
+                {showSortMenu && (
+                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg z-50 py-2">
+                    <div className="px-3 py-2 text-xs font-semibold text-gray-500 border-b">
+                      Ordenar por
+                    </div>
+                    {[
+                      { value: 'venda_total', label: 'Total Vendas' },
+                      { value: 'total_quantidade', label: 'Quantidade' },
+                      { value: 'numero_vendas', label: 'Nº Clientes' },
+                      { value: 'ticket_medio', label: 'Ticket Médio' },
+                    ].map((field) => (
+                      <button
+                        key={field.value}
+                        onClick={() => {
+                          setSortField(field.value as SortField);
+                          setShowSortMenu(false);
+                        }}
+                        className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
+                          sortField === field.value ? 'bg-primary-50 text-primary-700 font-medium' : 'text-gray-700'
+                        }`}
+                      >
+                        {field.label}
+                      </button>
+                    ))}
+                    <div className="border-t mt-2 pt-2 px-3 pb-1">
+                      <div className="text-xs font-semibold text-gray-500 mb-1">Direção</div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setSortOrder('desc')}
+                          className={`flex-1 px-3 py-1.5 text-xs rounded ${
+                            sortOrder === 'desc'
+                              ? 'bg-primary-600 text-white'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
+                        >
+                          Maior → Menor
+                        </button>
+                        <button
+                          onClick={() => setSortOrder('asc')}
+                          className={`flex-1 px-3 py-1.5 text-xs rounded ${
+                            sortOrder === 'asc'
+                              ? 'bg-primary-600 text-white'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
+                        >
+                          Menor → Maior
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={() => refetch()}
+                disabled={isFetching}
+                className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-colors disabled:opacity-50"
+                aria-label="Atualizar dados"
+              >
+                <RefreshCw className={`w-5 h-5 ${isFetching ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">Atualizar</span>
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -97,7 +168,12 @@ export function Dashboard() {
           </div>
         )}
 
-        <VendasList vendas={data?.vendas || []} isLoading={isLoading} />
+        <VendasList
+          vendas={data?.vendas || []}
+          isLoading={isLoading}
+          sortField={sortField}
+          sortOrder={sortOrder}
+        />
 
         {data && (
           <div className="mt-6 text-center text-xs text-gray-500">
