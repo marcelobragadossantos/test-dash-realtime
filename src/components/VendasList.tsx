@@ -14,12 +14,22 @@ interface VendasListProps {
 
 export function VendasList({ vendas, isLoading, sortField, sortOrder }: VendasListProps) {
   const [searchTerm, setSearchTerm] = useState('');
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
+    }).format(value);
+  };
+
+  const formatCurrencyWithDecimals = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(value);
   };
 
@@ -144,7 +154,7 @@ export function VendasList({ vendas, isLoading, sortField, sortOrder }: VendasLi
           <p className="text-2xl font-bold mb-3">{formatNumber(totalQuantidade)}</p>
           <div className="pt-2 border-t border-white/20">
             <p className="text-xs opacity-75">Ticket Médio</p>
-            <p className="text-sm font-semibold">{formatCurrency(ticketMedio)}</p>
+            <p className="text-sm font-semibold">{formatCurrencyWithDecimals(ticketMedio)}</p>
           </div>
         </div>
       </div>
@@ -214,7 +224,7 @@ export function VendasList({ vendas, isLoading, sortField, sortOrder }: VendasLi
                 <div className="flex flex-col">
                   <span className="text-gray-500 mb-1">Ticket Médio</span>
                   <span className="font-semibold text-gray-700">
-                    {formatCurrency(venda.venda_total / venda.numero_vendas)}
+                    {formatCurrencyWithDecimals(venda.venda_total / venda.numero_vendas)}
                   </span>
                 </div>
               </div>
