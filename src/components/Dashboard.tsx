@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { RefreshCw, AlertCircle, ArrowUpDown } from 'lucide-react';
 import { DateNavigator } from './DateNavigator';
@@ -15,6 +15,24 @@ export function Dashboard() {
   const [sortField, setSortField] = useState<SortField>('venda_total');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [showSortMenu, setShowSortMenu] = useState(false);
+  const sortMenuRef = useRef<HTMLDivElement>(null);
+
+  // Fecha o menu ao clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (sortMenuRef.current && !sortMenuRef.current.contains(event.target as Node)) {
+        setShowSortMenu(false);
+      }
+    };
+
+    if (showSortMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showSortMenu]);
 
   const getParams = () => {
     if (viewMode === 'day') {
@@ -45,7 +63,7 @@ export function Dashboard() {
               <p className="text-primary-100 text-sm mt-1">Real Time</p>
             </div>
             <div className="flex items-center gap-2">
-              <div className="relative">
+              <div className="relative" ref={sortMenuRef}>
                 <button
                   onClick={() => setShowSortMenu(!showSortMenu)}
                   className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-colors"
