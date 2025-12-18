@@ -6,7 +6,7 @@ import { VendasList } from './VendasList';
 import { useVendas } from '../hooks/useVendas';
 import { ViewMode } from '../types/api';
 
-type SortField = 'venda_total' | 'total_quantidade' | 'numero_vendas' | 'ticket_medio';
+type SortField = 'venda_total' | 'total_quantidade' | 'numero_vendas' | 'ticket_medio' | 'cmv';
 type SortOrder = 'asc' | 'desc';
 
 export function Dashboard() {
@@ -82,6 +82,7 @@ export function Dashboard() {
                       { value: 'venda_total', label: 'Total Vendas' },
                       { value: 'total_quantidade', label: 'Quantidade' },
                       { value: 'numero_vendas', label: 'Nº Clientes' },
+                      { value: 'cmv', label: '%CMV' },
                       { value: 'ticket_medio', label: 'Ticket Médio' },
                     ].map((field) => (
                       <button
