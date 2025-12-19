@@ -10,9 +10,10 @@ interface VendasListProps {
   isLoading?: boolean;
   sortField: SortField;
   sortOrder: SortOrder;
+  isCompactMode: boolean;
 }
 
-export function VendasList({ vendas, isLoading, sortField, sortOrder }: VendasListProps) {
+export function VendasList({ vendas, isLoading, sortField, sortOrder, isCompactMode }: VendasListProps) {
   const [searchTerm, setSearchTerm] = useState('');
 
   const formatCurrency = (value: number) => {
@@ -35,6 +36,25 @@ export function VendasList({ vendas, isLoading, sortField, sortOrder }: VendasLi
 
   const formatNumber = (value: number) => {
     return new Intl.NumberFormat('pt-BR').format(value);
+  };
+
+  // Renderiza o indicador apropriado para o modo compacto
+  const renderCompactIndicator = (venda: Venda) => {
+    switch (sortField) {
+      case 'venda_total':
+        return <p className="text-lg font-bold text-primary-600">{formatCurrency(venda.venda_total)}</p>;
+      case 'total_quantidade':
+        return <p className="text-lg font-bold text-gray-700">{formatNumber(venda.total_quantidade)}</p>;
+      case 'numero_vendas':
+        return <p className="text-lg font-bold text-gray-700">{formatNumber(venda.numero_vendas)}</p>;
+      case 'cmv':
+        return <p className="text-lg font-bold text-gray-700">{((venda.custo / venda.venda_total) * 100).toFixed(1)}%</p>;
+      case 'ticket_medio':
+        const tm = venda.numero_vendas > 0 ? venda.venda_total / venda.numero_vendas : 0;
+        return <p className="text-lg font-bold text-gray-700">{formatCurrencyWithDecimals(tm)}</p>;
+      default:
+        return null;
+    }
   };
 
   // Verifica se o tempo é maior que 1h (formato: XXd XXh XXm XXs)
@@ -207,45 +227,62 @@ export function VendasList({ vendas, isLoading, sortField, sortOrder }: VendasLi
                   </p>
                 </div>
               </div>
+
+              {isCompactMode && (
+                <div className="text-right pl-2">
+                  <span className="text-[10px] text-gray-400 block uppercase tracking-wider">
+                    {sortField === 'venda_total' && 'Venda'}
+                    {sortField === 'total_quantidade' && 'Qtd'}
+                    {sortField === 'numero_vendas' && 'Cli'}
+                    {sortField === 'ticket_medio' && 'TM'}
+                    {sortField === 'cmv' && 'CMV'}
+                  </span>
+                  {renderCompactIndicator(venda)}
+                </div>
+              )}
             </div>
 
-            <div className="grid grid-cols-2 gap-4 pt-3 border-t border-gray-100">
-              <div>
-                <p className="text-xs text-gray-500 mb-1">Valor Total</p>
-                <p className="text-lg font-bold text-primary-600">
-                  {formatCurrency(venda.venda_total)}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500 mb-1">Quantidade</p>
-                <p className="text-lg font-bold text-gray-700">
-                  {formatNumber(venda.total_quantidade)}
-                </p>
-              </div>
-            </div>
+            {!isCompactMode && (
+              <>
+                <div className="grid grid-cols-2 gap-4 pt-3 border-t border-gray-100">
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Valor Total</p>
+                    <p className="text-lg font-bold text-primary-600">
+                      {formatCurrency(venda.venda_total)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Quantidade</p>
+                    <p className="text-lg font-bold text-gray-700">
+                      {formatNumber(venda.total_quantidade)}
+                    </p>
+                  </div>
+                </div>
 
-            <div className="mt-3 pt-3 border-t border-gray-100">
-              <div className="grid grid-cols-3 gap-4 text-xs">
-                <div className="flex flex-col">
-                  <span className="text-gray-500 mb-1">Nº Clientes</span>
-                  <span className="font-semibold text-gray-700">
-                    {formatNumber(venda.numero_vendas)}
-                  </span>
+                <div className="mt-3 pt-3 border-t border-gray-100">
+                  <div className="grid grid-cols-3 gap-4 text-xs">
+                    <div className="flex flex-col">
+                      <span className="text-gray-500 mb-1">Nº Clientes</span>
+                      <span className="font-semibold text-gray-700">
+                        {formatNumber(venda.numero_vendas)}
+                      </span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-gray-500 mb-1">%CMV</span>
+                      <span className="font-semibold text-gray-700">
+                        {((venda.custo / venda.venda_total) * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-gray-500 mb-1">Ticket Médio</span>
+                      <span className="font-semibold text-gray-700">
+                        {formatCurrencyWithDecimals(venda.venda_total / venda.numero_vendas)}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex flex-col">
-                  <span className="text-gray-500 mb-1">%CMV</span>
-                  <span className="font-semibold text-gray-700">
-                    {((venda.custo / venda.venda_total) * 100).toFixed(1)}%
-                  </span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-gray-500 mb-1">Ticket Médio</span>
-                  <span className="font-semibold text-gray-700">
-                    {formatCurrencyWithDecimals(venda.venda_total / venda.numero_vendas)}
-                  </span>
-                </div>
-              </div>
-            </div>
+              </>
+            )}
           </div>
         ))}
         </div>
