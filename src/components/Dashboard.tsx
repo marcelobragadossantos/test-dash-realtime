@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
-import { RefreshCw, AlertCircle, ArrowUpDown, Eye, List } from 'lucide-react';
+import { RefreshCw, AlertCircle, ArrowUpDown, LayoutGrid, AlignJustify } from 'lucide-react';
 import { DateNavigator } from './DateNavigator';
 import { VendasList } from './VendasList';
 import { useVendas } from '../hooks/useVendas';
@@ -81,13 +81,13 @@ export function Dashboard() {
                 onClick={() => setIsCompactMode(!isCompactMode)}
                 className={`p-2 rounded-lg transition-colors ${
                   isCompactMode
-                    ? 'bg-primary-500 text-white shadow-sm'
-                    : 'bg-white/20 text-white hover:bg-white/30'
+                    ? 'bg-white/20 text-white hover:bg-white/30'
+                    : 'bg-primary-500 text-white shadow-sm'
                 }`}
-                title={isCompactMode ? "Ver Detalhes" : "Modo Compacto"}
+                title={isCompactMode ? "Modo Detalhado" : "Modo Compacto"}
                 aria-label="Alternar modo de visualização"
               >
-                {isCompactMode ? <Eye className="w-5 h-5" /> : <List className="w-5 h-5" />}
+                {isCompactMode ? <AlignJustify className="w-5 h-5" /> : <LayoutGrid className="w-5 h-5" />}
               </button>
 
               <div className="relative" ref={sortMenuRef}>
