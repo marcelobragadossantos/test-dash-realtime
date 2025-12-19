@@ -73,7 +73,7 @@ export function Dashboard() {
         <div className="max-w-7xl mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-white">Dashboard de Vendas</h1>
+              <h1 className="text-2xl font-bold text-white">Dashboard</h1>
               <p className="text-primary-100 text-xs mt-1">{getSortDescription()}</p>
             </div>
             <div className="flex items-center gap-2">
