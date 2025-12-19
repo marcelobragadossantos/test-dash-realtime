@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Store, TrendingUp, Package, Search } from 'lucide-react';
+import { Store, TrendingUp, Package, Search, ChevronDown } from 'lucide-react';
 import { Venda } from '../types/api';
 
 type SortField = 'venda_total' | 'total_quantidade' | 'numero_vendas' | 'ticket_medio' | 'cmv';
@@ -15,6 +15,19 @@ interface VendasListProps {
 
 export function VendasList({ vendas, isLoading, sortField, sortOrder, isCompactMode }: VendasListProps) {
   const [searchTerm, setSearchTerm] = useState('');
+  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
+
+  const toggleCardExpansion = (codigo: string) => {
+    setExpandedCards(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(codigo)) {
+        newSet.delete(codigo);
+      } else {
+        newSet.add(codigo);
+      }
+      return newSet;
+    });
+  };
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -203,10 +216,17 @@ export function VendasList({ vendas, isLoading, sortField, sortOrder, isCompactM
         </div>
       ) : (
         <div className="space-y-3">
-          {filteredVendas.map((venda) => (
+          {filteredVendas.map((venda) => {
+            const isExpanded = expandedCards.has(venda.codigo);
+            const shouldShowDetails = !isCompactMode || isExpanded;
+
+            return (
           <div
             key={venda.codigo}
-            className="bg-white rounded-lg shadow-md p-4 hover:shadow-lg transition-all duration-300 ease-in-out"
+            className={`bg-white rounded-lg shadow-md p-4 hover:shadow-lg transition-all duration-300 ease-in-out ${
+              isCompactMode ? 'cursor-pointer' : ''
+            }`}
+            onClick={() => isCompactMode && toggleCardExpansion(venda.codigo)}
           >
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-start gap-3 flex-1">
@@ -229,20 +249,27 @@ export function VendasList({ vendas, isLoading, sortField, sortOrder, isCompactM
               </div>
 
               {isCompactMode && (
-                <div className="text-right pl-2">
-                  <span className="text-[10px] text-gray-500 block uppercase tracking-wider font-medium">
-                    {sortField === 'venda_total' && 'Venda'}
-                    {sortField === 'total_quantidade' && 'Qtd'}
-                    {sortField === 'numero_vendas' && 'Cli'}
-                    {sortField === 'ticket_medio' && 'TM'}
-                    {sortField === 'cmv' && 'CMV'}
-                  </span>
-                  {renderCompactIndicator(venda)}
+                <div className="text-right pl-2 flex items-center gap-2">
+                  <div className="text-right">
+                    <span className="text-[10px] text-gray-500 block uppercase tracking-wider font-medium">
+                      {sortField === 'venda_total' && 'Venda'}
+                      {sortField === 'total_quantidade' && 'Qtd'}
+                      {sortField === 'numero_vendas' && 'Cli'}
+                      {sortField === 'ticket_medio' && 'TM'}
+                      {sortField === 'cmv' && 'CMV'}
+                    </span>
+                    {renderCompactIndicator(venda)}
+                  </div>
+                  <ChevronDown
+                    className={`w-5 h-5 text-gray-400 transition-transform duration-300 ${
+                      isExpanded ? 'rotate-180' : ''
+                    }`}
+                  />
                 </div>
               )}
             </div>
 
-            {!isCompactMode && (
+            {shouldShowDetails && (
               <div className="animate-in fade-in duration-300">
                 <div className="grid grid-cols-2 gap-4 pt-3 border-t border-gray-100">
                   <div>
@@ -284,7 +311,8 @@ export function VendasList({ vendas, isLoading, sortField, sortOrder, isCompactM
               </div>
             )}
           </div>
-        ))}
+            );
+          })}
         </div>
       )}
     </div>
