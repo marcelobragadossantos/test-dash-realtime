@@ -206,7 +206,7 @@ export function VendasList({ vendas, isLoading, sortField, sortOrder, isCompactM
           {filteredVendas.map((venda) => (
           <div
             key={venda.codigo}
-            className="bg-white rounded-lg shadow-md p-4 hover:shadow-lg transition-shadow"
+            className="bg-white rounded-lg shadow-md p-4 hover:shadow-lg transition-all duration-300 ease-in-out"
           >
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-start gap-3 flex-1">
@@ -230,7 +230,7 @@ export function VendasList({ vendas, isLoading, sortField, sortOrder, isCompactM
 
               {isCompactMode && (
                 <div className="text-right pl-2">
-                  <span className="text-[10px] text-gray-400 block uppercase tracking-wider">
+                  <span className="text-[10px] text-gray-500 block uppercase tracking-wider font-medium">
                     {sortField === 'venda_total' && 'Venda'}
                     {sortField === 'total_quantidade' && 'Qtd'}
                     {sortField === 'numero_vendas' && 'Cli'}
@@ -243,7 +243,7 @@ export function VendasList({ vendas, isLoading, sortField, sortOrder, isCompactM
             </div>
 
             {!isCompactMode && (
-              <>
+              <div className="animate-in fade-in duration-300">
                 <div className="grid grid-cols-2 gap-4 pt-3 border-t border-gray-100">
                   <div>
                     <p className="text-xs text-gray-500 mb-1">Valor Total</p>
@@ -281,7 +281,7 @@ export function VendasList({ vendas, isLoading, sortField, sortOrder, isCompactM
                     </div>
                   </div>
                 </div>
-              </>
+              </div>
             )}
           </div>
         ))}
