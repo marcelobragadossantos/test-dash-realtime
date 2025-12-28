@@ -70,12 +70,9 @@ export function Dashboard() {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-gradient-to-r from-primary-600 to-primary-700 shadow-lg">
-        <div className="max-w-7xl mx-auto px-4 py-6">
+        <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-              <p className="text-primary-100 text-xs mt-1">{getSortDescription()}</p>
-            </div>
+            <h1 className="text-2xl font-bold text-white">Dashboard</h1>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setIsCompactMode(!isCompactMode)}
@@ -165,6 +162,7 @@ export function Dashboard() {
               </button>
             </div>
           </div>
+          <p className="text-primary-200 text-[10px] text-right mt-1 opacity-80">{getSortDescription()}</p>
         </div>
       </header>
 
