@@ -1,4 +1,4 @@
-import { VendasResponse, VendasParams } from '../types/api';
+import { VendasResponse, VendasParams, SyncStatusResponse } from '../types/api';
 
 // Remove barra final da URL se existir
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '');
@@ -37,6 +37,24 @@ export async function fetchVendas(params?: VendasParams): Promise<VendasResponse
 
   if (!response.ok) {
     throw new Error(`Erro ao buscar vendas: ${response.status} ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+export async function fetchSyncStatus(): Promise<SyncStatusResponse> {
+  const url = new URL('/sync-status', API_BASE_URL);
+
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+    headers: {
+      'X-Secret-Key': API_SECRET_KEY,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Erro ao buscar status de sincronização: ${response.status} ${response.statusText}`);
   }
 
   return response.json();

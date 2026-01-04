@@ -25,3 +25,17 @@ export interface VendasParams {
 }
 
 export type ViewMode = 'day' | 'month';
+
+// Tipos para o endpoint /sync-status
+export interface LojaSync {
+  codigo: string;
+  loja: string;
+  regional: string;
+  tempo_ultimo_envio: string | null;
+}
+
+export interface SyncStatusResponse {
+  data_consulta: string;
+  total_registros: number;
+  lojas: LojaSync[];
+}
