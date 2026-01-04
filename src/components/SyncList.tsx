@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { Search, Wifi, WifiOff, AlertTriangle, Clock } from 'lucide-react';
-import { Venda } from '../types/api';
+import { LojaSync } from '../types/api';
 
 interface SyncListProps {
-  vendas: Venda[];
+  lojas: LojaSync[];
   isLoading?: boolean;
 }
 
-type SyncStatus = 'online' | 'warning' | 'offline';
+type SyncStatus = 'online' | 'warning' | 'offline' | 'unknown';
 
 interface SyncInfo {
   status: SyncStatus;
@@ -15,26 +15,32 @@ interface SyncInfo {
   minutesAgo: number;
 }
 
-export function SyncList({ vendas, isLoading }: SyncListProps) {
+export function SyncList({ lojas, isLoading }: SyncListProps) {
   const [searchTerm, setSearchTerm] = useState('');
 
   // Parseia o tempo_ultimo_envio e retorna informações de status
-  const parseSyncStatus = (tempo: string): SyncInfo => {
-    // Formato esperado: "XXd XXh XXm XXs" ou variações
-    const daysMatch = tempo.match(/(\d+)d/);
-    const hoursMatch = tempo.match(/(\d+)h/);
-    const minutesMatch = tempo.match(/(\d+)m/);
+  // Formato esperado: "HH:MM:SS" ou null
+  const parseSyncStatus = (tempo: string | null): SyncInfo => {
+    // Se não há tempo, considera como offline/desconhecido
+    if (!tempo) {
+      return { status: 'unknown', label: 'Sem dados', minutesAgo: Infinity };
+    }
 
-    const days = daysMatch ? parseInt(daysMatch[1]) : 0;
-    const hours = hoursMatch ? parseInt(hoursMatch[1]) : 0;
-    const minutes = minutesMatch ? parseInt(minutesMatch[1]) : 0;
+    // Formato: "HH:MM:SS"
+    const parts = tempo.split(':');
+    if (parts.length !== 3) {
+      return { status: 'unknown', label: tempo, minutesAgo: Infinity };
+    }
 
-    const totalMinutes = days * 24 * 60 + hours * 60 + minutes;
+    const hours = parseInt(parts[0]) || 0;
+    const minutes = parseInt(parts[1]) || 0;
+
+    const totalMinutes = hours * 60 + minutes;
 
     // Lógica de status:
     // Verde: < 1h (60 min)
     // Amarelo: >= 1h e < 24h
-    // Vermelho: >= 24h ou dia anterior
+    // Vermelho: >= 24h
     if (totalMinutes < 60) {
       return { status: 'online', label: tempo, minutesAgo: totalMinutes };
     } else if (totalMinutes < 24 * 60) {
@@ -44,30 +50,34 @@ export function SyncList({ vendas, isLoading }: SyncListProps) {
     }
   };
 
-  // Ordena as vendas por maior atraso primeiro
-  const vendasOrdenadas = [...vendas].sort((a, b) => {
+  // Ordena as lojas por maior atraso primeiro
+  const lojasOrdenadas = [...lojas].sort((a, b) => {
     const statusA = parseSyncStatus(a.tempo_ultimo_envio);
     const statusB = parseSyncStatus(b.tempo_ultimo_envio);
     return statusB.minutesAgo - statusA.minutesAgo; // Maior atraso primeiro
   });
 
   // Filtra por busca
-  const filteredVendas = vendasOrdenadas.filter((venda) => {
+  const filteredLojas = lojasOrdenadas.filter((loja) => {
     if (!searchTerm) return true;
 
     const term = searchTerm.toLowerCase();
-    const codigo = venda.codigo.toLowerCase();
-    const loja = venda.loja.toLowerCase();
-    const regional = venda.regional.toLowerCase();
+    const codigo = loja.codigo.toLowerCase();
+    const nome = loja.loja.toLowerCase();
+    const regional = loja.regional.toLowerCase();
 
-    return codigo.includes(term) || loja.includes(term) || regional.includes(term);
+    return codigo.includes(term) || nome.includes(term) || regional.includes(term);
   });
 
   // Conta status para resumo
-  const statusCounts = vendasOrdenadas.reduce(
-    (acc, venda) => {
-      const { status } = parseSyncStatus(venda.tempo_ultimo_envio);
-      acc[status]++;
+  const statusCounts = lojasOrdenadas.reduce(
+    (acc, loja) => {
+      const { status } = parseSyncStatus(loja.tempo_ultimo_envio);
+      if (status === 'unknown') {
+        acc.offline++;
+      } else {
+        acc[status]++;
+      }
       return acc;
     },
     { online: 0, warning: 0, offline: 0 }
@@ -80,6 +90,7 @@ export function SyncList({ vendas, isLoading }: SyncListProps) {
       case 'warning':
         return <AlertTriangle className="w-5 h-5 text-yellow-500" />;
       case 'offline':
+      case 'unknown':
         return <WifiOff className="w-5 h-5 text-red-500" />;
     }
   };
@@ -92,6 +103,7 @@ export function SyncList({ vendas, isLoading }: SyncListProps) {
       case 'warning':
         return `${baseClasses} bg-yellow-100 text-yellow-700`;
       case 'offline':
+      case 'unknown':
         return `${baseClasses} bg-red-100 text-red-700`;
     }
   };
@@ -104,6 +116,8 @@ export function SyncList({ vendas, isLoading }: SyncListProps) {
         return 'Atenção';
       case 'offline':
         return 'Offline';
+      case 'unknown':
+        return 'Sem dados';
     }
   };
 
@@ -126,7 +140,7 @@ export function SyncList({ vendas, isLoading }: SyncListProps) {
     );
   }
 
-  if (vendas.length === 0) {
+  if (lojas.length === 0) {
     return (
       <div className="bg-white rounded-lg shadow-md p-8 text-center">
         <WifiOff className="w-12 h-12 text-gray-300 mx-auto mb-3" />
@@ -189,13 +203,13 @@ export function SyncList({ vendas, isLoading }: SyncListProps) {
         </div>
         {searchTerm && (
           <p className="mt-2 text-sm text-gray-500">
-            {filteredVendas.length} {filteredVendas.length === 1 ? 'loja encontrada' : 'lojas encontradas'}
+            {filteredLojas.length} {filteredLojas.length === 1 ? 'loja encontrada' : 'lojas encontradas'}
           </p>
         )}
       </div>
 
       {/* Lista de Lojas */}
-      {filteredVendas.length === 0 ? (
+      {filteredLojas.length === 0 ? (
         <div className="bg-white rounded-lg shadow-md p-8 text-center">
           <Search className="w-12 h-12 text-gray-300 mx-auto mb-3" />
           <p className="text-gray-500">Nenhuma loja encontrada com "{searchTerm}"</p>
@@ -208,12 +222,12 @@ export function SyncList({ vendas, isLoading }: SyncListProps) {
         </div>
       ) : (
         <div className="space-y-2">
-          {filteredVendas.map((venda) => {
-            const syncInfo = parseSyncStatus(venda.tempo_ultimo_envio);
+          {filteredLojas.map((loja) => {
+            const syncInfo = parseSyncStatus(loja.tempo_ultimo_envio);
 
             return (
               <div
-                key={venda.codigo}
+                key={loja.codigo}
                 className="bg-white rounded-lg shadow-sm border border-gray-100 p-3 hover:shadow-md transition-shadow"
               >
                 <div className="flex items-center gap-3">
@@ -232,9 +246,9 @@ export function SyncList({ vendas, isLoading }: SyncListProps) {
 
                   {/* Informações da Loja */}
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-gray-900 truncate">{venda.loja}</h3>
+                    <h3 className="font-semibold text-gray-900 truncate">{loja.loja}</h3>
                     <p className="text-xs text-gray-500 truncate">
-                      {venda.codigo} • {venda.regional}
+                      {loja.codigo} • {loja.regional}
                     </p>
                   </div>
 

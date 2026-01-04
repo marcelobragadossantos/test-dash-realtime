@@ -14,6 +14,7 @@ import { DateNavigator } from './DateNavigator';
 import { VendasList } from './VendasList';
 import { SyncList } from './SyncList';
 import { useVendas } from '../hooks/useVendas';
+import { useSyncStatus } from '../hooks/useSyncStatus';
 import { ViewMode } from '../types/api';
 
 // Configuração: tempo mínimo de loading em milissegundos (5 segundos)
@@ -75,15 +76,6 @@ export function Dashboard() {
     }
   };
 
-  // Parâmetros para query do Monitor (SEMPRE mês vigente)
-  const getMonitorParams = () => {
-    const now = new Date();
-    return {
-      data_inicio: format(startOfMonth(now), 'yyyy-MM-dd'),
-      data_fim: format(endOfMonth(now), 'yyyy-MM-dd'),
-    };
-  };
-
   const getSortDescription = () => {
     const fieldNames: Record<SortField, string> = {
       venda_total: 'Total Vendas',
@@ -100,8 +92,8 @@ export function Dashboard() {
   // Query para Indicadores (aba principal)
   const queryIndicadores = useVendas(getIndicadoresParams());
 
-  // Query para Monitor (SEMPRE mês vigente - executa em paralelo)
-  const queryMonitor = useVendas(getMonitorParams());
+  // Query para Monitor de Sincronização (endpoint dedicado /sync-status)
+  const querySyncStatus = useSyncStatus();
 
   // Refetch quando muda data ou viewMode
   useEffect(() => {
@@ -109,7 +101,7 @@ export function Dashboard() {
   }, [currentDate, viewMode]);
 
   // Verifica se está em loading inicial (considera ambas as queries e o tempo mínimo)
-  const isInitialLoading = !isMinLoadingFinished || queryIndicadores.isLoading || queryMonitor.isLoading;
+  const isInitialLoading = !isMinLoadingFinished || queryIndicadores.isLoading || querySyncStatus.isLoading;
 
   // Calcula o progresso visual do loading (para feedback)
   const [loadingProgress, setLoadingProgress] = useState(0);
@@ -123,6 +115,20 @@ export function Dashboard() {
       return () => clearInterval(interval);
     }
   }, [isInitialLoading, loadingStartTime]);
+
+  // Handler para atualizar dados - chama apenas a query da aba ativa
+  const handleRefresh = () => {
+    if (activeTab === 'indicadores') {
+      queryIndicadores.refetch();
+    } else {
+      querySyncStatus.refetch();
+    }
+  };
+
+  // Verifica se está carregando (baseado na aba ativa)
+  const isRefreshing = activeTab === 'indicadores'
+    ? queryIndicadores.isFetching
+    : querySyncStatus.isFetching;
 
   // Splash Screen / Loading Screen
   if (isInitialLoading) {
@@ -168,7 +174,7 @@ export function Dashboard() {
             </div>
             <div className="flex items-center gap-1.5">
               <div className={`w-2 h-2 rounded-full ${
-                queryMonitor.isLoading ? 'bg-yellow-400 animate-pulse' : 'bg-green-400'
+                querySyncStatus.isLoading ? 'bg-yellow-400 animate-pulse' : 'bg-green-400'
               }`} />
               <span>Monitor</span>
             </div>
@@ -268,15 +274,12 @@ export function Dashboard() {
               )}
 
               <button
-                onClick={() => {
-                  queryIndicadores.refetch();
-                  queryMonitor.refetch();
-                }}
-                disabled={queryIndicadores.isFetching || queryMonitor.isFetching}
+                onClick={handleRefresh}
+                disabled={isRefreshing}
                 className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-colors disabled:opacity-50"
                 aria-label="Atualizar dados"
               >
-                <RefreshCw className={`w-5 h-5 ${(queryIndicadores.isFetching || queryMonitor.isFetching) ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
                 <span className="hidden sm:inline">Atualizar</span>
               </button>
             </div>
@@ -392,21 +395,21 @@ export function Dashboard() {
             <div className="mb-4">
               <h2 className="text-lg font-semibold text-gray-800">Monitor de Sincronização</h2>
               <p className="text-sm text-gray-500">
-                Status de conexão das lojas no mês vigente
+                Status de conexão das lojas em tempo real
               </p>
             </div>
 
-            {queryMonitor.error && (
+            {querySyncStatus.error && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
                 <div className="flex items-start gap-3">
                   <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
                   <div>
                     <h3 className="font-semibold text-red-800 mb-1">Erro ao carregar dados do monitor</h3>
                     <p className="text-sm text-red-600">
-                      {queryMonitor.error instanceof Error ? queryMonitor.error.message : 'Ocorreu um erro desconhecido'}
+                      {querySyncStatus.error instanceof Error ? querySyncStatus.error.message : 'Ocorreu um erro desconhecido'}
                     </p>
                     <button
-                      onClick={() => queryMonitor.refetch()}
+                      onClick={() => querySyncStatus.refetch()}
                       className="mt-2 text-sm font-medium text-red-700 hover:text-red-800 underline"
                     >
                       Tentar novamente
@@ -417,13 +420,13 @@ export function Dashboard() {
             )}
 
             <SyncList
-              vendas={queryMonitor.data?.vendas || []}
-              isLoading={queryMonitor.isFetching && !queryMonitor.data}
+              lojas={querySyncStatus.data?.lojas || []}
+              isLoading={querySyncStatus.isFetching && !querySyncStatus.data}
             />
 
-            {queryMonitor.data && (
+            {querySyncStatus.data && (
               <div className="mt-6 text-center text-xs text-gray-500">
-                Última atualização: {new Date(queryMonitor.data.data_consulta).toLocaleString('pt-BR')}
+                Última atualização: {new Date(querySyncStatus.data.data_consulta).toLocaleString('pt-BR')}
               </div>
             )}
           </>
