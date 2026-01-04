@@ -19,23 +19,36 @@ export function SyncList({ lojas, isLoading }: SyncListProps) {
   const [searchTerm, setSearchTerm] = useState('');
 
   // Parseia o tempo_ultimo_envio e retorna informações de status
-  // Formato esperado: "HH:MM:SS" ou null
+  // Formatos suportados: "XXd XXh XXm XXs" ou "HH:MM:SS" ou null
   const parseSyncStatus = (tempo: string | null): SyncInfo => {
     // Se não há tempo, considera como offline/desconhecido
     if (!tempo) {
       return { status: 'unknown', label: 'Sem dados', minutesAgo: Infinity };
     }
 
-    // Formato: "HH:MM:SS"
-    const parts = tempo.split(':');
-    if (parts.length !== 3) {
-      return { status: 'unknown', label: tempo, minutesAgo: Infinity };
+    let totalMinutes = 0;
+
+    // Formato 1: "XXd XXh XXm XXs" (ex: "00d 00h 00m 27s")
+    const daysMatch = tempo.match(/(\d+)d/);
+    const hoursMatch = tempo.match(/(\d+)h/);
+    const minutesMatch = tempo.match(/(\d+)m/);
+
+    if (daysMatch || hoursMatch || minutesMatch) {
+      const days = daysMatch ? parseInt(daysMatch[1]) : 0;
+      const hours = hoursMatch ? parseInt(hoursMatch[1]) : 0;
+      const minutes = minutesMatch ? parseInt(minutesMatch[1]) : 0;
+      totalMinutes = days * 24 * 60 + hours * 60 + minutes;
+    } else {
+      // Formato 2: "HH:MM:SS"
+      const parts = tempo.split(':');
+      if (parts.length === 3) {
+        const hours = parseInt(parts[0]) || 0;
+        const minutes = parseInt(parts[1]) || 0;
+        totalMinutes = hours * 60 + minutes;
+      } else {
+        return { status: 'unknown', label: tempo, minutesAgo: Infinity };
+      }
     }
-
-    const hours = parseInt(parts[0]) || 0;
-    const minutes = parseInt(parts[1]) || 0;
-
-    const totalMinutes = hours * 60 + minutes;
 
     // Lógica de status:
     // Verde: < 1h (60 min)
