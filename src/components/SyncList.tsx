@@ -99,38 +99,12 @@ export function SyncList({ lojas, isLoading }: SyncListProps) {
   const getStatusIcon = (status: SyncStatus) => {
     switch (status) {
       case 'online':
-        return <Wifi className="w-5 h-5 text-green-500" />;
+        return <Wifi className="w-4 h-4 text-green-600" />;
       case 'warning':
-        return <AlertTriangle className="w-5 h-5 text-yellow-500" />;
+        return <AlertTriangle className="w-4 h-4 text-yellow-600" />;
       case 'offline':
       case 'unknown':
-        return <WifiOff className="w-5 h-5 text-red-500" />;
-    }
-  };
-
-  const getStatusBadge = (status: SyncStatus) => {
-    const baseClasses = 'px-2 py-0.5 rounded-full text-xs font-medium';
-    switch (status) {
-      case 'online':
-        return `${baseClasses} bg-green-100 text-green-700`;
-      case 'warning':
-        return `${baseClasses} bg-yellow-100 text-yellow-700`;
-      case 'offline':
-      case 'unknown':
-        return `${baseClasses} bg-red-100 text-red-700`;
-    }
-  };
-
-  const getStatusLabel = (status: SyncStatus) => {
-    switch (status) {
-      case 'online':
-        return 'Online';
-      case 'warning':
-        return 'Atenção';
-      case 'offline':
-        return 'Offline';
-      case 'unknown':
-        return 'Sem dados';
+        return <WifiOff className="w-4 h-4 text-red-600" />;
     }
   };
 
@@ -234,19 +208,19 @@ export function SyncList({ lojas, isLoading }: SyncListProps) {
           </button>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {filteredLojas.map((loja) => {
             const syncInfo = parseSyncStatus(loja.tempo_ultimo_envio);
 
             return (
               <div
                 key={loja.codigo}
-                className="bg-white rounded-lg shadow-sm border border-gray-100 p-3 hover:shadow-md transition-shadow"
+                className="bg-white rounded-lg shadow-md p-4 hover:shadow-lg transition-shadow"
               >
                 <div className="flex items-center gap-3">
                   {/* Ícone de Status */}
                   <div
-                    className={`flex items-center justify-center w-10 h-10 rounded-full ${
+                    className={`flex items-center justify-center w-8 h-8 rounded-full ${
                       syncInfo.status === 'online'
                         ? 'bg-green-100'
                         : syncInfo.status === 'warning'
@@ -259,21 +233,16 @@ export function SyncList({ lojas, isLoading }: SyncListProps) {
 
                   {/* Informações da Loja */}
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-gray-900 truncate">{loja.loja}</h3>
-                    <p className="text-xs text-gray-500 truncate">
+                    <h3 className="font-semibold text-gray-900">{loja.loja}</h3>
+                    <p className="text-[10px] sm:text-xs text-gray-500">
                       {loja.codigo} • {loja.regional}
                     </p>
                   </div>
 
-                  {/* Status e Tempo */}
-                  <div className="text-right flex-shrink-0">
-                    <span className={getStatusBadge(syncInfo.status)}>
-                      {getStatusLabel(syncInfo.status)}
-                    </span>
-                    <div className="flex items-center justify-end gap-1 mt-1">
-                      <Clock className="w-3 h-3 text-gray-400" />
-                      <span className="text-xs text-gray-500">{syncInfo.label}</span>
-                    </div>
+                  {/* Tempo */}
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <Clock className="w-3 h-3 text-gray-400" />
+                    <span className="text-xs text-gray-500">{syncInfo.label}</span>
                   </div>
                 </div>
               </div>
