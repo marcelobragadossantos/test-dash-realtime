@@ -239,8 +239,20 @@ export function SyncList({ lojas, isLoading }: SyncListProps) {
                         {loja.codigo} • {loja.regional}
                       </p>
                       <div className="flex items-center gap-1">
-                        <Clock className="w-3 h-3 text-gray-400" />
-                        <span className="text-[10px] sm:text-xs text-gray-500">{syncInfo.label}</span>
+                        <Clock className={`w-3 h-3 ${
+                          syncInfo.status === 'warning'
+                            ? 'text-yellow-600'
+                            : syncInfo.status === 'offline' || syncInfo.status === 'unknown'
+                            ? 'text-red-600'
+                            : 'text-gray-400'
+                        }`} />
+                        <span className={`text-[10px] sm:text-xs ${
+                          syncInfo.status === 'warning'
+                            ? 'text-yellow-600 font-medium'
+                            : syncInfo.status === 'offline' || syncInfo.status === 'unknown'
+                            ? 'text-red-600 font-medium'
+                            : 'text-gray-500'
+                        }`}>{syncInfo.label}</span>
                       </div>
                     </div>
                   </div>
