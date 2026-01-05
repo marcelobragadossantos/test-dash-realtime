@@ -234,15 +234,15 @@ export function SyncList({ lojas, isLoading }: SyncListProps) {
                   {/* Informações da Loja */}
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold text-gray-900">{loja.loja}</h3>
-                    <p className="text-[10px] sm:text-xs text-gray-500">
-                      {loja.codigo} • {loja.regional}
-                    </p>
-                  </div>
-
-                  {/* Tempo */}
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <Clock className="w-3 h-3 text-gray-400" />
-                    <span className="text-xs text-gray-500">{syncInfo.label}</span>
+                    <div className="flex items-center justify-between">
+                      <p className="text-[10px] sm:text-xs text-gray-500">
+                        {loja.codigo} • {loja.regional}
+                      </p>
+                      <div className="flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-gray-400" />
+                        <span className="text-[10px] sm:text-xs text-gray-500">{syncInfo.label}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
