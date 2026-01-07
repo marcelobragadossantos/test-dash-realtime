@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Wifi, WifiOff, AlertTriangle, Clock } from 'lucide-react';
+import { Search, Wifi, WifiOff, AlertTriangle, ArrowUp, ArrowDown } from 'lucide-react';
 import { LojaSync } from '../types/api';
 
 interface SyncListProps {
@@ -238,21 +238,31 @@ export function SyncList({ lojas, isLoading }: SyncListProps) {
                       <p className="text-[10px] sm:text-xs text-gray-500">
                         {loja.codigo} • {loja.regional}
                       </p>
-                      <div className="flex items-center gap-1">
-                        <Clock className={`w-3 h-3 ${
-                          syncInfo.status === 'warning'
-                            ? 'text-yellow-600'
-                            : syncInfo.status === 'offline' || syncInfo.status === 'unknown'
-                            ? 'text-red-600'
-                            : 'text-gray-400'
-                        }`} />
-                        <span className={`text-[10px] sm:text-xs ${
-                          syncInfo.status === 'warning'
-                            ? 'text-yellow-600 font-medium'
-                            : syncInfo.status === 'offline' || syncInfo.status === 'unknown'
-                            ? 'text-red-600 font-medium'
-                            : 'text-gray-500'
-                        }`}>{syncInfo.label}</span>
+                      <div className="flex items-center gap-2">
+                        {/* Tempo de Envio */}
+                        <div className="flex items-center gap-0.5">
+                          <ArrowUp className={`w-3 h-3 ${
+                            syncInfo.status === 'warning'
+                              ? 'text-yellow-600'
+                              : syncInfo.status === 'offline' || syncInfo.status === 'unknown'
+                              ? 'text-red-600'
+                              : 'text-gray-400'
+                          }`} />
+                          <span className={`text-[10px] sm:text-xs ${
+                            syncInfo.status === 'warning'
+                              ? 'text-yellow-600 font-medium'
+                              : syncInfo.status === 'offline' || syncInfo.status === 'unknown'
+                              ? 'text-red-600 font-medium'
+                              : 'text-gray-500'
+                          }`}>{syncInfo.label}</span>
+                        </div>
+                        {/* Tempo de Recebimento */}
+                        <div className="flex items-center gap-0.5">
+                          <ArrowDown className="w-3 h-3 text-gray-400" />
+                          <span className="text-[10px] sm:text-xs text-gray-500">
+                            {loja.tempo_ultimo_recebimento || '--'}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
