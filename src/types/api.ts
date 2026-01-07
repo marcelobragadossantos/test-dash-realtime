@@ -31,6 +31,7 @@ export interface LojaSync {
   codigo: string;
   loja: string;
   regional: string;
+  tempo_ultimo_recebimento: string | null;
   tempo_ultimo_envio: string | null;
 }
 
