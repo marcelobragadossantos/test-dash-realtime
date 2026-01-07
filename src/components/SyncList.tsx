@@ -210,7 +210,8 @@ export function SyncList({ lojas, isLoading }: SyncListProps) {
       ) : (
         <div className="space-y-3">
           {filteredLojas.map((loja) => {
-            const syncInfo = parseSyncStatus(loja.tempo_ultimo_envio);
+            const syncInfoEnvio = parseSyncStatus(loja.tempo_ultimo_envio);
+            const syncInfoRecebimento = parseSyncStatus(loja.tempo_ultimo_recebimento);
 
             return (
               <div
@@ -221,14 +222,14 @@ export function SyncList({ lojas, isLoading }: SyncListProps) {
                   {/* Ícone de Status */}
                   <div
                     className={`flex items-center justify-center w-8 h-8 rounded-full ${
-                      syncInfo.status === 'online'
+                      syncInfoEnvio.status === 'online'
                         ? 'bg-green-100'
-                        : syncInfo.status === 'warning'
+                        : syncInfoEnvio.status === 'warning'
                         ? 'bg-yellow-100'
                         : 'bg-red-100'
                     }`}
                   >
-                    {getStatusIcon(syncInfo.status)}
+                    {getStatusIcon(syncInfoEnvio.status)}
                   </div>
 
                   {/* Informações da Loja */}
@@ -242,26 +243,36 @@ export function SyncList({ lojas, isLoading }: SyncListProps) {
                         {/* Tempo de Envio */}
                         <div className="flex items-center gap-0.5">
                           <ArrowUp className={`w-3 h-3 ${
-                            syncInfo.status === 'warning'
+                            syncInfoEnvio.status === 'warning'
                               ? 'text-yellow-600'
-                              : syncInfo.status === 'offline' || syncInfo.status === 'unknown'
+                              : syncInfoEnvio.status === 'offline' || syncInfoEnvio.status === 'unknown'
                               ? 'text-red-600'
                               : 'text-gray-400'
                           }`} />
                           <span className={`text-[10px] sm:text-xs ${
-                            syncInfo.status === 'warning'
+                            syncInfoEnvio.status === 'warning'
                               ? 'text-yellow-600 font-medium'
-                              : syncInfo.status === 'offline' || syncInfo.status === 'unknown'
+                              : syncInfoEnvio.status === 'offline' || syncInfoEnvio.status === 'unknown'
                               ? 'text-red-600 font-medium'
                               : 'text-gray-500'
-                          }`}>{syncInfo.label}</span>
+                          }`}>{syncInfoEnvio.label}</span>
                         </div>
                         {/* Tempo de Recebimento */}
                         <div className="flex items-center gap-0.5">
-                          <ArrowDown className="w-3 h-3 text-gray-400" />
-                          <span className="text-[10px] sm:text-xs text-gray-500">
-                            {loja.tempo_ultimo_recebimento || '--'}
-                          </span>
+                          <ArrowDown className={`w-3 h-3 ${
+                            syncInfoRecebimento.status === 'warning'
+                              ? 'text-yellow-600'
+                              : syncInfoRecebimento.status === 'offline' || syncInfoRecebimento.status === 'unknown'
+                              ? 'text-red-600'
+                              : 'text-gray-400'
+                          }`} />
+                          <span className={`text-[10px] sm:text-xs ${
+                            syncInfoRecebimento.status === 'warning'
+                              ? 'text-yellow-600 font-medium'
+                              : syncInfoRecebimento.status === 'offline' || syncInfoRecebimento.status === 'unknown'
+                              ? 'text-red-600 font-medium'
+                              : 'text-gray-500'
+                          }`}>{syncInfoRecebimento.label}</span>
                         </div>
                       </div>
                     </div>
