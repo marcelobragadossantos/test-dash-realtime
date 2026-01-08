@@ -40,3 +40,14 @@ export interface SyncStatusResponse {
   total_registros: number;
   lojas: LojaSync[];
 }
+
+// Tipos para o Portal Gateway
+export interface PortalUser {
+  userId: number | null;
+  userName: string | null;
+  userEmail: string | null;
+  userRole: 'admin' | 'user' | null;
+  moduleId: number | null;
+  moduleName: string | null;
+  timestamp: number | null;
+}
