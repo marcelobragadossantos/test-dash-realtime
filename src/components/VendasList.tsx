@@ -118,6 +118,7 @@ export function VendasList({ vendas, isLoading, sortField, sortOrder, isCompactM
   const totalCusto = filteredVendas.reduce((acc, venda) => acc + venda.custo, 0);
   const ticketMedio = totalClientes > 0 ? totalVendas / totalClientes : 0;
   const cmvPercentual = totalVendas > 0 ? (totalCusto / totalVendas) * 100 : 0;
+  const margemPercentual = totalVendas > 0 ? ((totalVendas - totalCusto) / totalVendas) * 100 : 0;
 
   if (isLoading) {
     return (
@@ -196,9 +197,15 @@ export function VendasList({ vendas, isLoading, sortField, sortOrder, isCompactM
             <span className="text-sm font-medium opacity-90">Quantidade</span>
           </div>
           <p className="text-2xl font-bold mb-3">{formatNumber(totalQuantidade)}</p>
-          <div className="pt-2 border-t border-white/20">
-            <p className="text-xs opacity-75">Ticket Médio</p>
-            <p className="text-sm font-semibold">{formatCurrencyWithDecimals(ticketMedio)}</p>
+          <div className="pt-2 border-t border-white/20 flex items-center justify-between">
+            <div>
+              <p className="text-xs opacity-75">%Margem</p>
+              <p className="text-sm font-semibold">{margemPercentual.toFixed(1)}%</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs opacity-75">Ticket Médio</p>
+              <p className="text-sm font-semibold">{formatCurrencyWithDecimals(ticketMedio)}</p>
+            </div>
           </div>
         </div>
       </div>
@@ -271,7 +278,7 @@ export function VendasList({ vendas, isLoading, sortField, sortOrder, isCompactM
 
             {shouldShowDetails && (
               <div className="animate-in fade-in duration-300">
-                <div className="grid grid-cols-2 gap-4 pt-3 border-t border-gray-100">
+                <div className="grid grid-cols-3 gap-4 pt-3 border-t border-gray-100">
                   <div>
                     <p className="text-xs text-gray-500 mb-1">Valor Total</p>
                     <p className="text-lg font-bold text-primary-600">
@@ -284,20 +291,26 @@ export function VendasList({ vendas, isLoading, sortField, sortOrder, isCompactM
                       {formatNumber(venda.total_quantidade)}
                     </p>
                   </div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Nº Clientes</p>
+                    <p className="text-lg font-bold text-gray-700">
+                      {formatNumber(venda.numero_vendas)}
+                    </p>
+                  </div>
                 </div>
 
                 <div className="mt-3 pt-3 border-t border-gray-100">
                   <div className="grid grid-cols-3 gap-4 text-xs">
                     <div className="flex flex-col">
-                      <span className="text-gray-500 mb-1">Nº Clientes</span>
-                      <span className="font-semibold text-gray-700">
-                        {formatNumber(venda.numero_vendas)}
-                      </span>
-                    </div>
-                    <div className="flex flex-col">
                       <span className="text-gray-500 mb-1">%CMV</span>
                       <span className="font-semibold text-gray-700">
                         {((venda.custo / venda.venda_total) * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-gray-500 mb-1">%Margem</span>
+                      <span className="font-semibold text-gray-700">
+                        {(((venda.venda_total - venda.custo) / venda.venda_total) * 100).toFixed(1)}%
                       </span>
                     </div>
                     <div className="flex flex-col">
