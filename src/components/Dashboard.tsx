@@ -20,7 +20,7 @@ import { ViewMode } from '../types/api';
 // Configuração: tempo mínimo de loading em milissegundos (5 segundos)
 const MIN_LOADING_TIME = 5000;
 
-type SortField = 'venda_total' | 'total_quantidade' | 'numero_vendas' | 'ticket_medio' | 'cmv';
+type SortField = 'venda_total' | 'total_quantidade' | 'numero_vendas' | 'ticket_medio' | 'cmv' | 'margem';
 type SortOrder = 'asc' | 'desc';
 type ActiveTab = 'indicadores' | 'monitor';
 
@@ -82,7 +82,8 @@ export function Dashboard() {
       total_quantidade: 'Quantidade',
       numero_vendas: 'Nº Clientes',
       ticket_medio: 'Ticket Médio',
-      cmv: '%CMV'
+      cmv: '%CMV',
+      margem: '%Margem'
     };
 
     const direction = sortOrder === 'desc' ? 'Maior→Menor' : 'Menor→Maior';
@@ -227,6 +228,7 @@ export function Dashboard() {
                           { value: 'total_quantidade', label: 'Quantidade' },
                           { value: 'numero_vendas', label: 'Nº Clientes' },
                           { value: 'cmv', label: '%CMV' },
+                          { value: 'margem', label: '%Margem' },
                           { value: 'ticket_medio', label: 'Ticket Médio' },
                         ].map((field) => (
                           <button
