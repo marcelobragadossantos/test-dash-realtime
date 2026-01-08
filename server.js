@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import pg from 'pg';
 import dotenv from 'dotenv';
 
 // Carrega variáveis de ambiente
@@ -27,6 +27,51 @@ if (!API_SECRET_KEY) {
   console.error('❌ API_SECRET_KEY não está configurada');
   process.exit(1);
 }
+
+// ==========================================
+// Configuração do Banco de Dados (PostgreSQL)
+// ==========================================
+
+const DATABASE_URL = process.env.DATABASE_URL;
+let pool = null;
+
+if (DATABASE_URL) {
+  pool = new pg.Pool({
+    connectionString: DATABASE_URL,
+    ssl: DATABASE_URL.includes('localhost') ? false : { rejectUnauthorized: false }
+  });
+  console.log('📦 Banco de dados configurado');
+} else {
+  console.warn('⚠️ DATABASE_URL não configurada - RLS usará memória (dados não persistentes)');
+}
+
+// Criar tabela de permissões se não existir
+async function initDatabase() {
+  if (!pool) return;
+
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS vendas_permissoes (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        user_name VARCHAR(255),
+        permission_type VARCHAR(50) NOT NULL,
+        allowed_tabs TEXT[],
+        filter_type VARCHAR(50),
+        filter_values TEXT[],
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, permission_type)
+      )
+    `);
+    console.log('✅ Tabela vendas_permissoes verificada/criada');
+  } catch (error) {
+    console.error('❌ Erro ao criar tabela:', error.message);
+  }
+}
+
+// Inicializa o banco ao iniciar
+initDatabase();
 
 // Configuração CORS - permite Portal Gateway e outras origens
 const corsOptions = {
@@ -123,68 +168,135 @@ app.get('/api/sync-status', async (req, res) => {
 // RLS (Row-Level Security) Endpoints
 // ==========================================
 
-const RLS_CONFIG_FILE = join(__dirname, 'rls-config.json');
-
-// Carregar configuração RLS
-function loadRLSConfig() {
-  try {
-    if (existsSync(RLS_CONFIG_FILE)) {
-      const data = readFileSync(RLS_CONFIG_FILE, 'utf-8');
-      return JSON.parse(data);
-    }
-  } catch (error) {
-    console.error('Erro ao carregar RLS config:', error);
-  }
-  return { tabPermissions: [], storePermissions: [] };
-}
-
-// Salvar configuração RLS
-function saveRLSConfig(config) {
-  try {
-    writeFileSync(RLS_CONFIG_FILE, JSON.stringify(config, null, 2));
-    return true;
-  } catch (error) {
-    console.error('Erro ao salvar RLS config:', error);
-    return false;
-  }
-}
+// Fallback em memória quando não há banco configurado
+let memoryStore = { tabPermissions: [], storePermissions: [] };
 
 // GET - Obter configuração RLS
-app.get('/api/rls/config', (req, res) => {
-  const config = loadRLSConfig();
-  res.json(config);
+app.get('/api/rls/config', async (req, res) => {
+  try {
+    if (!pool) {
+      return res.json(memoryStore);
+    }
+
+    const result = await pool.query('SELECT * FROM vendas_permissoes ORDER BY user_id');
+
+    const tabPermissions = [];
+    const storePermissions = [];
+
+    for (const row of result.rows) {
+      if (row.permission_type === 'tab') {
+        tabPermissions.push({
+          id: row.id.toString(),
+          userId: row.user_id,
+          userName: row.user_name || '',
+          allowedTabs: row.allowed_tabs || []
+        });
+      } else if (row.permission_type === 'store') {
+        storePermissions.push({
+          id: row.id.toString(),
+          userId: row.user_id,
+          userName: row.user_name || '',
+          filterType: row.filter_type || 'all',
+          filterValues: row.filter_values || []
+        });
+      }
+    }
+
+    res.json({ tabPermissions, storePermissions });
+  } catch (error) {
+    console.error('Erro ao carregar RLS config:', error);
+    res.status(500).json({ error: 'Erro ao carregar configurações' });
+  }
 });
 
 // POST - Salvar configuração RLS
-app.post('/api/rls/config', (req, res) => {
+app.post('/api/rls/config', async (req, res) => {
   const { tabPermissions, storePermissions } = req.body;
 
-  const config = {
-    tabPermissions: tabPermissions || [],
-    storePermissions: storePermissions || [],
-    updatedAt: new Date().toISOString(),
-  };
+  try {
+    if (!pool) {
+      // Fallback em memória
+      memoryStore = { tabPermissions: tabPermissions || [], storePermissions: storePermissions || [] };
+      return res.json({ success: true, message: 'Configuração salva em memória (sem banco)' });
+    }
 
-  if (saveRLSConfig(config)) {
-    res.json({ success: true, message: 'Configuração salva com sucesso' });
-  } else {
+    // Limpar permissões existentes e inserir novas
+    await pool.query('BEGIN');
+
+    try {
+      // Deletar todas permissões existentes
+      await pool.query('DELETE FROM vendas_permissoes');
+
+      // Inserir permissões de tabs
+      for (const perm of (tabPermissions || [])) {
+        await pool.query(
+          `INSERT INTO vendas_permissoes (user_id, user_name, permission_type, allowed_tabs)
+           VALUES ($1, $2, 'tab', $3)`,
+          [perm.userId, perm.userName || '', perm.allowedTabs || []]
+        );
+      }
+
+      // Inserir permissões de lojas
+      for (const perm of (storePermissions || [])) {
+        await pool.query(
+          `INSERT INTO vendas_permissoes (user_id, user_name, permission_type, filter_type, filter_values)
+           VALUES ($1, $2, 'store', $3, $4)`,
+          [perm.userId, perm.userName || '', perm.filterType || 'all', perm.filterValues || []]
+        );
+      }
+
+      await pool.query('COMMIT');
+      res.json({ success: true, message: 'Configuração salva com sucesso' });
+    } catch (error) {
+      await pool.query('ROLLBACK');
+      throw error;
+    }
+  } catch (error) {
+    console.error('Erro ao salvar RLS config:', error);
     res.status(500).json({ success: false, error: 'Erro ao salvar configuração' });
   }
 });
 
 // GET - Verificar permissões de um usuário específico
-app.get('/api/rls/user/:userId', (req, res) => {
+app.get('/api/rls/user/:userId', async (req, res) => {
   const userId = parseInt(req.params.userId);
-  const config = loadRLSConfig();
 
-  const tabPermission = config.tabPermissions.find(p => p.userId === userId);
-  const storePermission = config.storePermissions.find(p => p.userId === userId);
+  try {
+    if (!pool) {
+      // Fallback em memória
+      const tabPermission = memoryStore.tabPermissions.find(p => p.userId === userId);
+      const storePermission = memoryStore.storePermissions.find(p => p.userId === userId);
+      return res.json({
+        userId,
+        tabs: tabPermission?.allowedTabs || ['indicadores', 'monitor'],
+        stores: storePermission || { filterType: 'all', filterValues: [] }
+      });
+    }
 
-  res.json({
-    userId,
-    tabs: tabPermission?.allowedTabs || ['indicadores', 'monitor'], // default: todas
-    stores: storePermission || { filterType: 'all', filterValues: [] }, // default: todas
-  });
+    const result = await pool.query(
+      'SELECT * FROM vendas_permissoes WHERE user_id = $1',
+      [userId]
+    );
+
+    let tabs = ['indicadores', 'monitor']; // default
+    let stores = { filterType: 'all', filterValues: [] }; // default
+
+    for (const row of result.rows) {
+      if (row.permission_type === 'tab') {
+        tabs = row.allowed_tabs || [];
+      } else if (row.permission_type === 'store') {
+        stores = {
+          filterType: row.filter_type || 'all',
+          filterValues: row.filter_values || []
+        };
+      }
+    }
+
+    res.json({ userId, tabs, stores });
+  } catch (error) {
+    console.error('Erro ao buscar permissões do usuário:', error);
+    res.status(500).json({ error: 'Erro ao buscar permissões' });
+  }
 });
 
 // SPA fallback - todas outras rotas servem o index.html
