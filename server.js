@@ -27,9 +27,30 @@ if (!API_SECRET_KEY) {
   process.exit(1);
 }
 
+// Configuração CORS - permite Portal Gateway e outras origens
+const corsOptions = {
+  origin: true, // Permite qualquer origem
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+};
+
 // Middleware
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
+
+// Headers CORS adicionais para garantir compatibilidade
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+
+  // Handle preflight
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
 
 // Serve arquivos estáticos do frontend
 app.use(express.static(join(__dirname, 'dist')));
