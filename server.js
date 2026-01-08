@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
 import dotenv from 'dotenv';
 
 // Carrega variáveis de ambiente
@@ -116,6 +117,74 @@ app.get('/api/sync-status', async (req, res) => {
     console.error('Erro no proxy /sync-status:', error);
     res.status(500).json({ error: 'Erro interno do servidor' });
   }
+});
+
+// ==========================================
+// RLS (Row-Level Security) Endpoints
+// ==========================================
+
+const RLS_CONFIG_FILE = join(__dirname, 'rls-config.json');
+
+// Carregar configuração RLS
+function loadRLSConfig() {
+  try {
+    if (existsSync(RLS_CONFIG_FILE)) {
+      const data = readFileSync(RLS_CONFIG_FILE, 'utf-8');
+      return JSON.parse(data);
+    }
+  } catch (error) {
+    console.error('Erro ao carregar RLS config:', error);
+  }
+  return { tabPermissions: [], storePermissions: [] };
+}
+
+// Salvar configuração RLS
+function saveRLSConfig(config) {
+  try {
+    writeFileSync(RLS_CONFIG_FILE, JSON.stringify(config, null, 2));
+    return true;
+  } catch (error) {
+    console.error('Erro ao salvar RLS config:', error);
+    return false;
+  }
+}
+
+// GET - Obter configuração RLS
+app.get('/api/rls/config', (req, res) => {
+  const config = loadRLSConfig();
+  res.json(config);
+});
+
+// POST - Salvar configuração RLS
+app.post('/api/rls/config', (req, res) => {
+  const { tabPermissions, storePermissions } = req.body;
+
+  const config = {
+    tabPermissions: tabPermissions || [],
+    storePermissions: storePermissions || [],
+    updatedAt: new Date().toISOString(),
+  };
+
+  if (saveRLSConfig(config)) {
+    res.json({ success: true, message: 'Configuração salva com sucesso' });
+  } else {
+    res.status(500).json({ success: false, error: 'Erro ao salvar configuração' });
+  }
+});
+
+// GET - Verificar permissões de um usuário específico
+app.get('/api/rls/user/:userId', (req, res) => {
+  const userId = parseInt(req.params.userId);
+  const config = loadRLSConfig();
+
+  const tabPermission = config.tabPermissions.find(p => p.userId === userId);
+  const storePermission = config.storePermissions.find(p => p.userId === userId);
+
+  res.json({
+    userId,
+    tabs: tabPermission?.allowedTabs || ['indicadores', 'monitor'], // default: todas
+    stores: storePermission || { filterType: 'all', filterValues: [] }, // default: todas
+  });
 });
 
 // SPA fallback - todas outras rotas servem o index.html

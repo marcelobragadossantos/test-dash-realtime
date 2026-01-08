@@ -51,3 +51,26 @@ export interface PortalUser {
   moduleName: string | null;
   timestamp: number | null;
 }
+
+// Tipos para RLS (Row-Level Security)
+export type TabName = 'indicadores' | 'monitor' | 'rls';
+
+export interface TabPermission {
+  id?: string;
+  userId: number;
+  userName: string;
+  allowedTabs: TabName[];
+}
+
+export interface StorePermission {
+  id?: string;
+  userId: number;
+  userName: string;
+  filterType: 'loja' | 'regional' | 'all';
+  filterValues: string[]; // códigos de lojas ou nomes de regionais
+}
+
+export interface RLSConfig {
+  tabPermissions: TabPermission[];
+  storePermissions: StorePermission[];
+}

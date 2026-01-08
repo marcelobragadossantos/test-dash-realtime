@@ -8,11 +8,13 @@ import {
   AlignJustify,
   BarChart3,
   Activity,
-  Loader2
+  Loader2,
+  Shield
 } from 'lucide-react';
 import { DateNavigator } from './DateNavigator';
 import { VendasList } from './VendasList';
 import { SyncList } from './SyncList';
+import { RLSTab } from './RLSTab';
 import { useVendas } from '../hooks/useVendas';
 import { useSyncStatus } from '../hooks/useSyncStatus';
 import { usePortalGatewayUser } from '../hooks/usePortalGatewayUser';
@@ -21,9 +23,12 @@ import { ViewMode } from '../types/api';
 // Configuração: tempo mínimo de loading em milissegundos (5 segundos)
 const MIN_LOADING_TIME = 5000;
 
+// ID do usuário admin que pode ver a guia RLS
+const RLS_ADMIN_USER_ID = 4;
+
 type SortField = 'venda_total' | 'total_quantidade' | 'numero_vendas' | 'ticket_medio' | 'cmv' | 'margem';
 type SortOrder = 'asc' | 'desc';
-type ActiveTab = 'indicadores' | 'monitor';
+type ActiveTab = 'indicadores' | 'monitor' | 'rls';
 
 export function Dashboard() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -42,6 +47,9 @@ export function Dashboard() {
   const welcomeMessage = portalUser?.userName
     ? `Bem vindo ${portalUser.userName}`
     : 'Bem vindo Visitante';
+
+  // Verificar se usuário é admin RLS (pode ver a guia de permissões)
+  const isRLSAdmin = portalUser?.userId === RLS_ADMIN_USER_ID;
 
   // Fecha o menu ao clicar fora
   useEffect(() => {
@@ -128,15 +136,18 @@ export function Dashboard() {
   const handleRefresh = () => {
     if (activeTab === 'indicadores') {
       queryIndicadores.refetch();
-    } else {
+    } else if (activeTab === 'monitor') {
       querySyncStatus.refetch();
     }
+    // RLS não precisa de refresh manual
   };
 
   // Verifica se está carregando (baseado na aba ativa)
   const isRefreshing = activeTab === 'indicadores'
     ? queryIndicadores.isFetching
-    : querySyncStatus.isFetching;
+    : activeTab === 'monitor'
+    ? querySyncStatus.isFetching
+    : false;
 
   // Splash Screen / Loading Screen
   if (isInitialLoading) {
@@ -342,6 +353,23 @@ export function Dashboard() {
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white rounded-t" />
               )}
             </button>
+            {/* Guia RLS - apenas para admin (userId === 4) via Portal */}
+            {isRLSAdmin && (
+              <button
+                onClick={() => setActiveTab('rls')}
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors relative ${
+                  activeTab === 'rls'
+                    ? 'text-white'
+                    : 'text-primary-200 hover:text-white'
+                }`}
+              >
+                <Shield className="w-5 h-5" />
+                <span className="hidden sm:inline">RLS</span>
+                {activeTab === 'rls' && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white rounded-t" />
+                )}
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -440,6 +468,17 @@ export function Dashboard() {
               isLoading={querySyncStatus.isFetching && !querySyncStatus.data}
             />
           </>
+        )}
+
+        {/* Conteúdo da Aba RLS - apenas para admin */}
+        {activeTab === 'rls' && isRLSAdmin && (
+          <RLSTab
+            availableStores={queryIndicadores.data?.vendas.map(v => ({
+              codigo: v.codigo,
+              loja: v.loja,
+              regional: v.regional
+            })) || []}
+          />
         )}
       </main>
     </div>
