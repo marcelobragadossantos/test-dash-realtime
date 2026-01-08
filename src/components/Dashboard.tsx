@@ -15,6 +15,7 @@ import { VendasList } from './VendasList';
 import { SyncList } from './SyncList';
 import { useVendas } from '../hooks/useVendas';
 import { useSyncStatus } from '../hooks/useSyncStatus';
+import { usePortalGatewayUser } from '../hooks/usePortalGatewayUser';
 import { ViewMode } from '../types/api';
 
 // Configuração: tempo mínimo de loading em milissegundos (5 segundos)
@@ -35,6 +36,12 @@ export function Dashboard() {
   const [isMinLoadingFinished, setIsMinLoadingFinished] = useState(false);
   const [loadingStartTime] = useState(() => Date.now());
   const sortMenuRef = useRef<HTMLDivElement>(null);
+
+  // Portal Gateway - dados do usuário
+  const portalUser = usePortalGatewayUser();
+  const welcomeMessage = portalUser?.userName
+    ? `Bem vindo ${portalUser.userName}`
+    : 'Bem vindo Visitante';
 
   // Fecha o menu ao clicar fora
   useEffect(() => {
@@ -190,7 +197,10 @@ export function Dashboard() {
       <header className="bg-gradient-to-r from-primary-600 to-primary-700 shadow-lg">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-white">Dashboard</h1>
+            <div>
+              <h1 className="text-2xl font-bold text-white">Dashboard</h1>
+              <p className="text-primary-200 text-sm">{welcomeMessage}</p>
+            </div>
             <div className="flex items-center gap-2">
               {/* Botões de ação só aparecem na aba Indicadores */}
               {activeTab === 'indicadores' && (
