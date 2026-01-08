@@ -152,6 +152,7 @@ export function Dashboard() {
 
           {/* Título */}
           <h1 className="text-2xl font-bold text-white mb-2">Dashboard de Vendas</h1>
+          <p className="text-white text-lg mb-1">{welcomeMessage}</p>
           <p className="text-primary-200 mb-8">Sincronizando dados das lojas...</p>
 
           {/* Spinner */}
@@ -199,7 +200,6 @@ export function Dashboard() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-              <p className="text-primary-200 text-sm">{welcomeMessage}</p>
               {activeTab === 'indicadores' && queryIndicadores.data && (
                 <p className="text-primary-200 text-[10px] opacity-80">
                   Última atualização: {new Date(queryIndicadores.data.data_consulta).toLocaleString('pt-BR')}
