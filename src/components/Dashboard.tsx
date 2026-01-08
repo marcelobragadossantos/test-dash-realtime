@@ -200,6 +200,16 @@ export function Dashboard() {
             <div>
               <h1 className="text-2xl font-bold text-white">Dashboard</h1>
               <p className="text-primary-200 text-sm">{welcomeMessage}</p>
+              {activeTab === 'indicadores' && queryIndicadores.data && (
+                <p className="text-primary-200 text-[10px] opacity-80">
+                  Última atualização: {new Date(queryIndicadores.data.data_consulta).toLocaleString('pt-BR')}
+                </p>
+              )}
+              {activeTab === 'monitor' && querySyncStatus.data && (
+                <p className="text-primary-200 text-[10px] opacity-80">
+                  Última atualização: {new Date(querySyncStatus.data.data_consulta).toLocaleString('pt-BR')}
+                </p>
+              )}
             </div>
             <div className="flex items-center gap-2">
               {/* Botões de ação só aparecem na aba Indicadores */}
@@ -392,12 +402,6 @@ export function Dashboard() {
               sortOrder={sortOrder}
               isCompactMode={isCompactMode}
             />
-
-            {queryIndicadores.data && (
-              <div className="mt-6 text-center text-xs text-gray-500">
-                Última atualização: {new Date(queryIndicadores.data.data_consulta).toLocaleString('pt-BR')}
-              </div>
-            )}
           </>
         )}
 
@@ -435,12 +439,6 @@ export function Dashboard() {
               lojas={querySyncStatus.data?.lojas || []}
               isLoading={querySyncStatus.isFetching && !querySyncStatus.data}
             />
-
-            {querySyncStatus.data && (
-              <div className="mt-6 text-center text-xs text-gray-500">
-                Última atualização: {new Date(querySyncStatus.data.data_consulta).toLocaleString('pt-BR')}
-              </div>
-            )}
           </>
         )}
       </main>
