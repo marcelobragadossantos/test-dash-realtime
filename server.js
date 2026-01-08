@@ -1,0 +1,109 @@
+import express from 'express';
+import cors from 'cors';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+import dotenv from 'dotenv';
+
+// Carrega variáveis de ambiente
+dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Configuração da API (variáveis de ambiente do servidor)
+const API_BASE_URL = process.env.API_BASE_URL?.replace(/\/$/, '');
+const API_SECRET_KEY = process.env.API_SECRET_KEY;
+
+if (!API_BASE_URL) {
+  console.error('❌ API_BASE_URL não está configurada');
+  process.exit(1);
+}
+
+if (!API_SECRET_KEY) {
+  console.error('❌ API_SECRET_KEY não está configurada');
+  process.exit(1);
+}
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+
+// Serve arquivos estáticos do frontend
+app.use(express.static(join(__dirname, 'dist')));
+
+// ==========================================
+// Proxy Endpoints - Esconde URL e chave da API
+// ==========================================
+
+// Proxy para /vendas-realtime
+app.get('/api/vendas-realtime', async (req, res) => {
+  try {
+    const url = new URL('/vendas-realtime', API_BASE_URL);
+
+    // Repassa query params
+    if (req.query.data) url.searchParams.append('data', req.query.data);
+    if (req.query.data_inicio) url.searchParams.append('data_inicio', req.query.data_inicio);
+    if (req.query.data_fim) url.searchParams.append('data_fim', req.query.data_fim);
+
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: {
+        'X-Secret-Key': API_SECRET_KEY,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      return res.status(response.status).json({
+        error: `Erro ao buscar vendas: ${response.status} ${response.statusText}`,
+      });
+    }
+
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error('Erro no proxy /vendas-realtime:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// Proxy para /sync-status
+app.get('/api/sync-status', async (req, res) => {
+  try {
+    const url = new URL('/sync-status', API_BASE_URL);
+
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: {
+        'X-Secret-Key': API_SECRET_KEY,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      return res.status(response.status).json({
+        error: `Erro ao buscar sync-status: ${response.status} ${response.statusText}`,
+      });
+    }
+
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error('Erro no proxy /sync-status:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
+// SPA fallback - todas outras rotas servem o index.html
+app.get('*', (req, res) => {
+  res.sendFile(join(__dirname, 'dist', 'index.html'));
+});
+
+// Inicia servidor
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Servidor rodando na porta ${PORT}`);
+  console.log(`📡 Proxy API configurado para: ${API_BASE_URL}`);
+});

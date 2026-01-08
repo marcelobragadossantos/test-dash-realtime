@@ -1,19 +1,10 @@
 import { VendasResponse, VendasParams, SyncStatusResponse } from '../types/api';
 
-// Remove barra final da URL se existir
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '');
-const API_SECRET_KEY = import.meta.env.VITE_API_SECRET_KEY;
-
-if (!API_BASE_URL) {
-  throw new Error('VITE_API_BASE_URL não está configurada');
-}
-
-if (!API_SECRET_KEY) {
-  throw new Error('VITE_API_SECRET_KEY não está configurada');
-}
+// Usa proxy local - a chave da API fica apenas no servidor
+const API_PROXY_BASE = '/api';
 
 export async function fetchVendas(params?: VendasParams): Promise<VendasResponse> {
-  const url = new URL('/vendas-realtime', API_BASE_URL);
+  const url = new URL(`${API_PROXY_BASE}/vendas-realtime`, window.location.origin);
 
   if (params?.data) {
     url.searchParams.append('data', params.data);
@@ -30,7 +21,6 @@ export async function fetchVendas(params?: VendasParams): Promise<VendasResponse
   const response = await fetch(url.toString(), {
     method: 'GET',
     headers: {
-      'X-Secret-Key': API_SECRET_KEY,
       'Content-Type': 'application/json',
     },
   });
@@ -43,12 +33,11 @@ export async function fetchVendas(params?: VendasParams): Promise<VendasResponse
 }
 
 export async function fetchSyncStatus(): Promise<SyncStatusResponse> {
-  const url = new URL('/sync-status', API_BASE_URL);
+  const url = new URL(`${API_PROXY_BASE}/sync-status`, window.location.origin);
 
   const response = await fetch(url.toString(), {
     method: 'GET',
     headers: {
-      'X-Secret-Key': API_SECRET_KEY,
       'Content-Type': 'application/json',
     },
   });
