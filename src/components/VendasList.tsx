@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Store, TrendingUp, Package, Search, ChevronDown } from 'lucide-react';
 import { Venda } from '../types/api';
 
-type SortField = 'venda_total' | 'total_quantidade' | 'numero_vendas' | 'ticket_medio' | 'cmv';
+type SortField = 'venda_total' | 'total_quantidade' | 'numero_vendas' | 'ticket_medio' | 'cmv' | 'margem';
 type SortOrder = 'asc' | 'desc';
 
 interface VendasListProps {
@@ -62,6 +62,9 @@ export function VendasList({ vendas, isLoading, sortField, sortOrder, isCompactM
         return <p className="text-lg font-bold text-gray-700">{formatNumber(venda.numero_vendas)}</p>;
       case 'cmv':
         return <p className="text-lg font-bold text-gray-700">{((venda.custo / venda.venda_total) * 100).toFixed(1)}%</p>;
+      case 'margem':
+        const margem = venda.venda_total > 0 ? ((venda.venda_total - venda.custo) / venda.venda_total) * 100 : 0;
+        return <p className="text-lg font-bold text-gray-700">{margem.toFixed(1)}%</p>;
       case 'ticket_medio':
         const tm = venda.numero_vendas > 0 ? venda.venda_total / venda.numero_vendas : 0;
         return <p className="text-lg font-bold text-gray-700">{formatCurrencyWithDecimals(tm)}</p>;
@@ -91,6 +94,9 @@ export function VendasList({ vendas, isLoading, sortField, sortOrder, isCompactM
       } else if (sortField === 'cmv') {
         valueA = a.venda_total > 0 ? (a.custo / a.venda_total) * 100 : 0;
         valueB = b.venda_total > 0 ? (b.custo / b.venda_total) * 100 : 0;
+      } else if (sortField === 'margem') {
+        valueA = a.venda_total > 0 ? ((a.venda_total - a.custo) / a.venda_total) * 100 : 0;
+        valueB = b.venda_total > 0 ? ((b.venda_total - b.custo) / b.venda_total) * 100 : 0;
       } else {
         valueA = a[sortField];
         valueB = b[sortField];
@@ -264,6 +270,7 @@ export function VendasList({ vendas, isLoading, sortField, sortOrder, isCompactM
                       {sortField === 'numero_vendas' && 'Cli'}
                       {sortField === 'ticket_medio' && 'TM'}
                       {sortField === 'cmv' && 'CMV'}
+                      {sortField === 'margem' && 'Margem'}
                     </span>
                     {renderCompactIndicator(venda)}
                   </div>
