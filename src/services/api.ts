@@ -1,10 +1,12 @@
 import { VendasResponse, VendasParams, SyncStatusResponse } from '../types/api';
 
-// Usa proxy local - a chave da API fica apenas no servidor
-const API_PROXY_BASE = '/api';
+// Se VITE_BACKEND_URL estiver definido, usa ele (para acesso via proxy do portal)
+// Caso contrário, usa caminho relativo /api (para acesso direto)
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL?.replace(/\/$/, '');
+const API_PROXY_BASE = BACKEND_URL ? `${BACKEND_URL}/api` : '/api';
 
 export async function fetchVendas(params?: VendasParams): Promise<VendasResponse> {
-  const url = new URL(`${API_PROXY_BASE}/vendas-realtime`, window.location.origin);
+  const url = new URL(`${API_PROXY_BASE}/vendas-realtime`, BACKEND_URL || window.location.origin);
 
   if (params?.data) {
     url.searchParams.append('data', params.data);
@@ -33,7 +35,7 @@ export async function fetchVendas(params?: VendasParams): Promise<VendasResponse
 }
 
 export async function fetchSyncStatus(): Promise<SyncStatusResponse> {
-  const url = new URL(`${API_PROXY_BASE}/sync-status`, window.location.origin);
+  const url = new URL(`${API_PROXY_BASE}/sync-status`, BACKEND_URL || window.location.origin);
 
   const response = await fetch(url.toString(), {
     method: 'GET',
