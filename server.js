@@ -119,7 +119,7 @@ app.get('/api/sync-status', async (req, res) => {
 });
 
 // SPA fallback - todas outras rotas servem o index.html
-app.get('*', (req, res) => {
+app.use((req, res) => {
   res.sendFile(join(__dirname, 'dist', 'index.html'));
 });
 
