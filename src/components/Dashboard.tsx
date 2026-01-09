@@ -55,6 +55,21 @@ export function Dashboard() {
   // Verificar se usuário é admin RLS (pode ver a guia de permissões)
   const isRLSAdmin = portalUser?.userId === RLS_ADMIN_USER_ID;
 
+  // Verificar permissões de guias
+  const canViewIndicadores = !userPermissions || userPermissions.tabs.includes('indicadores');
+  const canViewMonitor = !userPermissions || userPermissions.tabs.includes('monitor');
+
+  // Ajustar aba ativa se usuário não tem permissão
+  useEffect(() => {
+    if (userPermissions) {
+      if (activeTab === 'indicadores' && !canViewIndicadores) {
+        setActiveTab(canViewMonitor ? 'monitor' : 'rls');
+      } else if (activeTab === 'monitor' && !canViewMonitor) {
+        setActiveTab(canViewIndicadores ? 'indicadores' : 'rls');
+      }
+    }
+  }, [userPermissions, activeTab, canViewIndicadores, canViewMonitor]);
+
   // Fecha o menu ao clicar fora
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -350,34 +365,40 @@ export function Dashboard() {
         {/* Tabs de Navegação */}
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex border-b border-primary-500/30">
-            <button
-              onClick={() => setActiveTab('indicadores')}
-              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors relative ${
-                activeTab === 'indicadores'
-                  ? 'text-white'
-                  : 'text-primary-200 hover:text-white'
-              }`}
-            >
-              <BarChart3 className="w-5 h-5" />
-              <span className="hidden sm:inline">Indicadores</span>
-              {activeTab === 'indicadores' && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white rounded-t" />
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab('monitor')}
-              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors relative ${
-                activeTab === 'monitor'
-                  ? 'text-white'
-                  : 'text-primary-200 hover:text-white'
-              }`}
-            >
-              <Activity className="w-5 h-5" />
-              <span className="hidden sm:inline">Monitor</span>
-              {activeTab === 'monitor' && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white rounded-t" />
-              )}
-            </button>
+            {/* Guia Indicadores - verificar permissão */}
+            {canViewIndicadores && (
+              <button
+                onClick={() => setActiveTab('indicadores')}
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors relative ${
+                  activeTab === 'indicadores'
+                    ? 'text-white'
+                    : 'text-primary-200 hover:text-white'
+                }`}
+              >
+                <BarChart3 className="w-5 h-5" />
+                <span className="hidden sm:inline">Indicadores</span>
+                {activeTab === 'indicadores' && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white rounded-t" />
+                )}
+              </button>
+            )}
+            {/* Guia Monitor - verificar permissão */}
+            {canViewMonitor && (
+              <button
+                onClick={() => setActiveTab('monitor')}
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors relative ${
+                  activeTab === 'monitor'
+                    ? 'text-white'
+                    : 'text-primary-200 hover:text-white'
+                }`}
+              >
+                <Activity className="w-5 h-5" />
+                <span className="hidden sm:inline">Monitor</span>
+                {activeTab === 'monitor' && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white rounded-t" />
+                )}
+              </button>
+            )}
             {/* Guia RLS - apenas para admin (userId === 4) via Portal */}
             {isRLSAdmin && (
               <button
