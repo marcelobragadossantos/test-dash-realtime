@@ -14,6 +14,10 @@ import {
 } from 'lucide-react';
 import { TabPermission, StorePermission, TabName } from '../types/api';
 
+// Se VITE_BACKEND_URL estiver definido, usa ele (para acesso via proxy do portal)
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL?.replace(/\/$/, '');
+const API_BASE = BACKEND_URL ? `${BACKEND_URL}/api` : '/api';
+
 interface RLSTabProps {
   availableStores: { codigo: string; loja: string; regional: string }[];
 }
@@ -42,7 +46,7 @@ export function RLSTab({ availableStores }: RLSTabProps) {
   const loadConfig = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('/api/rls/config');
+      const response = await fetch(`${API_BASE}/rls/config`);
       if (response.ok) {
         const data = await response.json();
         setTabPermissions(data.tabPermissions || []);
@@ -59,7 +63,7 @@ export function RLSTab({ availableStores }: RLSTabProps) {
     setIsSaving(true);
     setMessage(null);
     try {
-      const response = await fetch('/api/rls/config', {
+      const response = await fetch(`${API_BASE}/rls/config`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tabPermissions, storePermissions }),
