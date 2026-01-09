@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import {
   RefreshCw,
@@ -18,6 +18,7 @@ import { RLSTab } from './RLSTab';
 import { useVendas } from '../hooks/useVendas';
 import { useSyncStatus } from '../hooks/useSyncStatus';
 import { usePortalGatewayUser } from '../hooks/usePortalGatewayUser';
+import { useUserPermissions } from '../hooks/useUserPermissions';
 import { ViewMode } from '../types/api';
 
 // Configuração: tempo mínimo de loading em milissegundos (5 segundos)
@@ -47,6 +48,9 @@ export function Dashboard() {
   const welcomeMessage = portalUser?.userName
     ? `Bem vindo ${portalUser.userName}`
     : 'Bem vindo Visitante';
+
+  // Buscar permissões RLS do usuário
+  const { permissions: userPermissions } = useUserPermissions(portalUser?.userId ?? null);
 
   // Verificar se usuário é admin RLS (pode ver a guia de permissões)
   const isRLSAdmin = portalUser?.userId === RLS_ADMIN_USER_ID;
@@ -110,6 +114,27 @@ export function Dashboard() {
 
   // Query para Monitor de Sincronização (endpoint dedicado /sync-status)
   const querySyncStatus = useSyncStatus();
+
+  // Filtrar vendas baseado nas permissões RLS do usuário
+  const filteredVendas = useMemo(() => {
+    const vendas = queryIndicadores.data?.vendas || [];
+
+    if (!userPermissions || userPermissions.stores.filterType === 'all') {
+      return vendas;
+    }
+
+    const { filterType, filterValues } = userPermissions.stores;
+
+    if (filterType === 'regional') {
+      return vendas.filter(v => filterValues.includes(v.regional));
+    }
+
+    if (filterType === 'loja') {
+      return vendas.filter(v => filterValues.includes(v.codigo));
+    }
+
+    return vendas;
+  }, [queryIndicadores.data?.vendas, userPermissions]);
 
   // Refetch quando muda data ou viewMode
   useEffect(() => {
@@ -388,7 +413,7 @@ export function Dashboard() {
             {queryIndicadores.data && (
               <div className="mb-4 flex items-center justify-between text-sm">
                 <div className="text-gray-600">
-                  <span className="font-medium">{queryIndicadores.data.total_registros}</span> lojas encontradas
+                  <span className="font-medium">{filteredVendas.length}</span> lojas encontradas
                 </div>
                 <div className="flex items-center gap-2">
                   <div
@@ -424,7 +449,7 @@ export function Dashboard() {
             )}
 
             <VendasList
-              vendas={queryIndicadores.data?.vendas || []}
+              vendas={filteredVendas}
               isLoading={queryIndicadores.isFetching && !queryIndicadores.data}
               sortField={sortField}
               sortOrder={sortOrder}
