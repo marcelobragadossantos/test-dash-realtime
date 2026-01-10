@@ -12,7 +12,7 @@ import {
   TooltipItem
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
-import { ArrowLeft, Calendar, List, Store, Info } from 'lucide-react';
+import { ArrowLeft, Calendar, List, Store, Info, Loader2 } from 'lucide-react';
 import { MetasDistribuidaResponse, MetasViewMode, PacingData } from '../types/metas';
 import { MetasPacingCard } from './MetasPacingCard';
 
@@ -51,24 +51,26 @@ export function MetasLojaDetail({
   const [viewMode, setViewMode] = useState<MetasViewMode>('calendario');
   const hoje = new Date().getDate();
 
-  // Calcula dados de pacing
+  // Calcula dados de pacing com casting numérico
   const pacingData: PacingData = useMemo(() => {
-    if (!metasDistribuida) {
+    // Proteção contra dados não carregados
+    if (!metasDistribuida?.dias) {
       return {
         metaAcumuladaHoje: 0,
-        vendasRealizadasHoje: vendasAcumuladas,
+        vendasRealizadasHoje: Number(vendasAcumuladas) || 0,
         diferenca: 0,
         percentualDiferenca: 0,
         status: 'no_prazo' as const,
       };
     }
 
-    // Soma das metas até hoje (dia atual inclusive)
+    // Soma das metas até hoje (dia atual inclusive) com casting numérico
     const metaAcumuladaHoje = metasDistribuida.dias
-      .filter(d => d.dia <= hoje)
-      .reduce((acc, d) => acc + d.meta_valor, 0);
+      .filter(d => Number(d.dia) <= hoje)
+      .reduce((acc, d) => acc + Number(d.meta_valor || 0), 0);
 
-    const diferenca = vendasAcumuladas - metaAcumuladaHoje;
+    const vendasNum = Number(vendasAcumuladas) || 0;
+    const diferenca = vendasNum - metaAcumuladaHoje;
     const percentualDiferenca = metaAcumuladaHoje > 0
       ? (diferenca / metaAcumuladaHoje) * 100
       : 0;
@@ -82,34 +84,39 @@ export function MetasLojaDetail({
 
     return {
       metaAcumuladaHoje,
-      vendasRealizadasHoje: vendasAcumuladas,
+      vendasRealizadasHoje: vendasNum,
       diferenca,
       percentualDiferenca,
       status,
     };
   }, [metasDistribuida, vendasAcumuladas, hoje]);
 
-  // Dados do gráfico
+  // Dados do gráfico com casting numérico obrigatório
   const chartData = useMemo(() => {
-    if (!metasDistribuida) return null;
+    // Proteção contra crash - verifica se dados existem
+    if (!metasDistribuida?.dias || metasDistribuida.dias.length === 0) {
+      return null;
+    }
 
-    const labels = metasDistribuida.dias.map(d => `Dia ${d.dia}`);
+    const labels = metasDistribuida.dias.map(d => `Dia ${Number(d.dia)}`);
 
-    // Meta acumulada (sazonal)
+    // Meta acumulada (sazonal) - CORREÇÃO: usar Number() para evitar concatenação de strings
     let acumuladoMeta = 0;
     const metaAcumulada = metasDistribuida.dias.map(d => {
-      acumuladoMeta += d.meta_valor;
+      acumuladoMeta += Number(d.meta_valor || 0);
       return acumuladoMeta;
     });
 
     // Vendas reais acumuladas (simulação proporcional até hoje)
-    // Na prática, você teria dados dia a dia do backend
+    const vendasNum = Number(vendasAcumuladas) || 0;
+    const metaAcumuladaHojeNum = pacingData.metaAcumuladaHoje || 1;
+
     const vendasDiarias = metasDistribuida.dias.map((d, index) => {
-      if (d.dia > hoje) return null; // Dias futuros não têm dados
+      if (Number(d.dia) > hoje) return null; // Dias futuros não têm dados
 
       // Distribuição proporcional das vendas até hoje
-      const proporcao = metaAcumulada[index] / (pacingData.metaAcumuladaHoje || 1);
-      return vendasAcumuladas * proporcao;
+      const proporcao = metaAcumulada[index] / metaAcumuladaHojeNum;
+      return vendasNum * proporcao;
     });
 
     return {
@@ -184,27 +191,75 @@ export function MetasLojaDetail({
     },
   };
 
-  const formatCurrency = (value: number) => {
+  const formatCurrency = (value: number | string | undefined | null) => {
+    const numValue = Number(value) || 0;
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
-    }).format(value);
+    }).format(numValue);
   };
 
+  // Estado de loading
   if (isLoading) {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <div className="w-10 h-10 bg-gray-200 rounded-lg animate-pulse"></div>
+          <button
+            onClick={onBack}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            aria-label="Voltar para ranking"
+          >
+            <ArrowLeft className="w-5 h-5 text-gray-600" />
+          </button>
           <div className="flex-1">
             <div className="h-5 bg-gray-200 rounded w-1/3 mb-2 animate-pulse"></div>
             <div className="h-4 bg-gray-200 rounded w-1/4 animate-pulse"></div>
           </div>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <div className="h-64 bg-gray-100 rounded animate-pulse"></div>
+        <div className="bg-white rounded-xl border border-gray-200 p-6 flex items-center justify-center">
+          <div className="text-center">
+            <Loader2 className="w-8 h-8 text-primary-500 animate-spin mx-auto mb-2" />
+            <p className="text-sm text-gray-500">Carregando dados da loja...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Estado de dados não disponíveis
+  if (!metasDistribuida?.dias) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={onBack}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            aria-label="Voltar para ranking"
+          >
+            <ArrowLeft className="w-5 h-5 text-gray-600" />
+          </button>
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <Store className="w-5 h-5 text-primary-500" />
+              <h2 className="text-lg font-semibold text-gray-800">{lojaNome}</h2>
+              <span className="text-sm text-gray-400">({lojaCodigo})</span>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
+          <Info className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-600 mb-2">Dados não disponíveis</h3>
+          <p className="text-sm text-gray-500">
+            Não foi possível carregar os dados de metas para esta loja.
+          </p>
+          <button
+            onClick={onBack}
+            className="mt-4 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
+          >
+            Voltar ao Ranking
+          </button>
         </div>
       </div>
     );
@@ -227,17 +282,15 @@ export function MetasLojaDetail({
             <h2 className="text-lg font-semibold text-gray-800">{lojaNome}</h2>
             <span className="text-sm text-gray-400">({lojaCodigo})</span>
           </div>
-          {metasDistribuida && (
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-xs text-gray-500">
-                Sazonalidade: {metasDistribuida.sazonalidade_usada}
-              </span>
-              <span className="text-gray-300">|</span>
-              <span className="text-xs text-gray-500">
-                Meta Total: {formatCurrency(metasDistribuida.total_meta_mes)}
-              </span>
-            </div>
-          )}
+          <div className="flex items-center gap-2 mt-1">
+            <span className="text-xs text-gray-500">
+              Sazonalidade: {metasDistribuida.sazonalidade_usada || 'N/A'}
+            </span>
+            <span className="text-gray-300">|</span>
+            <span className="text-xs text-gray-500">
+              Meta Total: {formatCurrency(metasDistribuida.total_meta_mes)}
+            </span>
+          </div>
         </div>
 
         {/* Switcher de Visualização */}
@@ -288,7 +341,13 @@ export function MetasLojaDetail({
           </div>
 
           <div className="h-80">
-            {chartData && <Line data={chartData} options={chartOptions} />}
+            {chartData ? (
+              <Line data={chartData} options={chartOptions} />
+            ) : (
+              <div className="h-full flex items-center justify-center text-gray-400">
+                <p>Dados insuficientes para gerar o gráfico</p>
+              </div>
+            )}
           </div>
         </div>
       ) : (
@@ -311,24 +370,26 @@ export function MetasLojaDetail({
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {metasDistribuida?.dias.map((dia, index) => {
+                {metasDistribuida.dias.map((dia, index) => {
+                  // Casting numérico para evitar concatenação de strings
                   const metaAcumulada = metasDistribuida.dias
                     .slice(0, index + 1)
-                    .reduce((acc, d) => acc + d.meta_valor, 0);
+                    .reduce((acc, d) => acc + Number(d.meta_valor || 0), 0);
 
-                  const isHoje = dia.dia === hoje;
-                  const isPassado = dia.dia < hoje;
-                  const isFuturo = dia.dia > hoje;
+                  const diaNum = Number(dia.dia);
+                  const isHoje = diaNum === hoje;
+                  const isPassado = diaNum < hoje;
+                  const isFuturo = diaNum > hoje;
 
                   return (
                     <tr
-                      key={dia.dia}
+                      key={diaNum}
                       className={`${isHoje ? 'bg-primary-50' : ''} ${isFuturo ? 'opacity-50' : ''}`}
                     >
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <span className={`font-medium ${isHoje ? 'text-primary-700' : 'text-gray-800'}`}>
-                            {dia.dia}
+                            {diaNum}
                           </span>
                           {isHoje && (
                             <span className="px-1.5 py-0.5 bg-primary-100 text-primary-700 text-[10px] font-medium rounded">
@@ -344,11 +405,11 @@ export function MetasLojaDetail({
                       </td>
                       <td className="px-4 py-3 text-right">
                         <span className={`text-sm ${
-                          dia.peso_aplicado > 1 ? 'text-green-600 font-medium' :
-                          dia.peso_aplicado < 1 ? 'text-red-600' :
+                          Number(dia.peso_aplicado) > 1 ? 'text-green-600 font-medium' :
+                          Number(dia.peso_aplicado) < 1 ? 'text-red-600' :
                           'text-gray-600'
                         }`}>
-                          {dia.peso_aplicado.toFixed(2)}x
+                          {Number(dia.peso_aplicado || 0).toFixed(2)}x
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
@@ -381,7 +442,7 @@ export function MetasLojaDetail({
                 <tr>
                   <td className="px-4 py-3 font-semibold text-gray-700">Total</td>
                   <td className="px-4 py-3 text-right font-bold text-gray-800" colSpan={3}>
-                    {metasDistribuida && formatCurrency(metasDistribuida.total_meta_mes)}
+                    {formatCurrency(metasDistribuida.total_meta_mes)}
                   </td>
                   <td></td>
                 </tr>
