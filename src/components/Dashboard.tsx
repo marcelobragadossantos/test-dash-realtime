@@ -9,14 +9,19 @@ import {
   BarChart3,
   Activity,
   Loader2,
-  Shield
+  Shield,
+  Target
 } from 'lucide-react';
 import { DateNavigator } from './DateNavigator';
 import { VendasList } from './VendasList';
 import { SyncList } from './SyncList';
 import { RLSTab } from './RLSTab';
+import { MetasRanking } from './MetasRanking';
+import { MetasLojaDetail } from './MetasLojaDetail';
 import { useVendas } from '../hooks/useVendas';
 import { useSyncStatus } from '../hooks/useSyncStatus';
+import { useMetasRegional } from '../hooks/useMetasRegional';
+import { useMetasDistribuida } from '../hooks/useMetasDistribuida';
 import { usePortalGatewayUser } from '../hooks/usePortalGatewayUser';
 import { useUserPermissions } from '../hooks/useUserPermissions';
 import { ViewMode } from '../types/api';
@@ -29,7 +34,10 @@ const RLS_ADMIN_USER_ID = 4;
 
 type SortField = 'venda_total' | 'total_quantidade' | 'numero_vendas' | 'ticket_medio' | 'cmv' | 'margem';
 type SortOrder = 'asc' | 'desc';
-type ActiveTab = 'indicadores' | 'monitor' | 'rls';
+type ActiveTab = 'indicadores' | 'monitor' | 'rls' | 'metas';
+
+// Feature flag: ID do usuário que pode ver a aba Metas (hardcoded para teste)
+const METAS_FEATURE_USER_ID = 4;
 
 export function Dashboard() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -43,6 +51,9 @@ export function Dashboard() {
   const [loadingStartTime] = useState(() => Date.now());
   const sortMenuRef = useRef<HTMLDivElement>(null);
 
+  // Estado para drill-down de Metas (loja selecionada)
+  const [selectedLoja, setSelectedLoja] = useState<{ codigo: string; nome: string } | null>(null);
+
   // Portal Gateway - dados do usuário
   const portalUser = usePortalGatewayUser();
   const welcomeMessage = portalUser?.userName
@@ -54,6 +65,24 @@ export function Dashboard() {
 
   // Verificar se usuário é admin RLS (pode ver a guia de permissões)
   const isRLSAdmin = portalUser?.userId === RLS_ADMIN_USER_ID;
+
+  // Feature flag: verificar se usuário pode ver a aba Metas
+  const canViewMetas = portalUser?.userId === METAS_FEATURE_USER_ID;
+
+  // Parâmetros para queries de Metas (baseado na data atual)
+  const metasParams = {
+    ano: currentDate.getFullYear(),
+    mes: currentDate.getMonth() + 1,
+  };
+
+  // Query para metas regionais (visão geral - todas as lojas)
+  const queryMetasRegional = useMetasRegional(metasParams);
+
+  // Query para metas distribuídas (detalhe da loja selecionada)
+  const queryMetasDistribuida = useMetasDistribuida(
+    selectedLoja ? { store_codigo: selectedLoja.codigo, ...metasParams } : null,
+    selectedLoja !== null
+  );
 
   // Verificar permissões de guias
   const canViewIndicadores = !userPermissions || userPermissions.tabs.includes('indicadores');
@@ -151,6 +180,13 @@ export function Dashboard() {
     return vendas;
   }, [queryIndicadores.data?.vendas, userPermissions]);
 
+  // Calcula vendas acumuladas da loja selecionada (para pacing)
+  const vendasLojaAcumuladas = useMemo(() => {
+    if (!selectedLoja) return 0;
+    const venda = filteredVendas.find(v => v.codigo === selectedLoja.codigo);
+    return venda?.venda_total || 0;
+  }, [selectedLoja, filteredVendas]);
+
   // Refetch quando muda data ou viewMode
   useEffect(() => {
     queryIndicadores.refetch();
@@ -178,8 +214,23 @@ export function Dashboard() {
       queryIndicadores.refetch();
     } else if (activeTab === 'monitor') {
       querySyncStatus.refetch();
+    } else if (activeTab === 'metas') {
+      queryMetasRegional.refetch();
+      if (selectedLoja) {
+        queryMetasDistribuida.refetch();
+      }
     }
     // RLS não precisa de refresh manual
+  };
+
+  // Handler para selecionar loja no ranking de metas
+  const handleSelectLoja = (lojaCodigo: string, lojaNome: string) => {
+    setSelectedLoja({ codigo: lojaCodigo, nome: lojaNome });
+  };
+
+  // Handler para voltar ao ranking de metas
+  const handleBackToRanking = () => {
+    setSelectedLoja(null);
   };
 
   // Verifica se está carregando (baseado na aba ativa)
@@ -187,6 +238,8 @@ export function Dashboard() {
     ? queryIndicadores.isFetching
     : activeTab === 'monitor'
     ? querySyncStatus.isFetching
+    : activeTab === 'metas'
+    ? queryMetasRegional.isFetching || queryMetasDistribuida.isFetching
     : false;
 
   // Splash Screen / Loading Screen
@@ -416,6 +469,26 @@ export function Dashboard() {
                 )}
               </button>
             )}
+            {/* Guia Metas - Feature Flag: apenas para userId === 4 */}
+            {canViewMetas && (
+              <button
+                onClick={() => {
+                  setActiveTab('metas');
+                  setSelectedLoja(null); // Reset drill-down ao entrar na aba
+                }}
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors relative ${
+                  activeTab === 'metas'
+                    ? 'text-white'
+                    : 'text-primary-200 hover:text-white'
+                }`}
+              >
+                <Target className="w-5 h-5" />
+                <span className="hidden sm:inline">Metas</span>
+                {activeTab === 'metas' && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white rounded-t" />
+                )}
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -525,6 +598,65 @@ export function Dashboard() {
               regional: v.regional
             })) || []}
           />
+        )}
+
+        {/* Conteúdo da Aba Metas - Feature Flag: apenas para userId === 4 */}
+        {activeTab === 'metas' && canViewMetas && (
+          <>
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold text-gray-800">
+                {selectedLoja ? 'Detalhe da Loja' : 'Metas & Performance'}
+              </h2>
+              <p className="text-sm text-gray-500">
+                {selectedLoja
+                  ? 'Análise de sazonalidade e ritmo de vendas'
+                  : `Ranking de lojas - ${new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(currentDate)}`
+                }
+              </p>
+            </div>
+
+            {queryMetasRegional.error && !selectedLoja && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h3 className="font-semibold text-red-800 mb-1">Erro ao carregar metas</h3>
+                    <p className="text-sm text-red-600">
+                      {queryMetasRegional.error instanceof Error ? queryMetasRegional.error.message : 'Ocorreu um erro desconhecido'}
+                    </p>
+                    <button
+                      onClick={() => queryMetasRegional.refetch()}
+                      className="mt-2 text-sm font-medium text-red-700 hover:text-red-800 underline"
+                    >
+                      Tentar novamente
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Visão Ranking (quando nenhuma loja selecionada) */}
+            {!selectedLoja && (
+              <MetasRanking
+                metas={queryMetasRegional.data?.metas || []}
+                vendas={filteredVendas}
+                onSelectLoja={handleSelectLoja}
+                isLoading={queryMetasRegional.isLoading}
+              />
+            )}
+
+            {/* Visão Detalhe (quando loja selecionada) */}
+            {selectedLoja && (
+              <MetasLojaDetail
+                lojaCodigo={selectedLoja.codigo}
+                lojaNome={selectedLoja.nome}
+                metasDistribuida={queryMetasDistribuida.data}
+                vendasAcumuladas={vendasLojaAcumuladas}
+                onBack={handleBackToRanking}
+                isLoading={queryMetasDistribuida.isLoading}
+              />
+            )}
+          </>
         )}
       </main>
     </div>
