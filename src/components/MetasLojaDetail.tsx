@@ -12,7 +12,7 @@ import {
   TooltipItem
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
-import { ArrowLeft, Calendar, List, Store, Info, Loader2 } from 'lucide-react';
+import { ArrowLeft, Calendar, List, Store, Info, Loader2, Target, TrendingUp, Sparkles } from 'lucide-react';
 import { MetasDistribuidaResponse, MetasViewMode, PacingData } from '../types/metas';
 import { MetasPacingCard } from './MetasPacingCard';
 
@@ -90,6 +90,39 @@ export function MetasLojaDetail({
       status,
     };
   }, [metasDistribuida, vendasAcumuladas, hoje]);
+
+  // Calcula KPIs do cabeçalho com casting numérico
+  const kpis = useMemo(() => {
+    if (!metasDistribuida?.dias) return null;
+
+    // 1. Meta Acumulada (Até hoje) - soma dos dias que já passaram
+    const metaAcumuladaAteHoje = metasDistribuida.dias
+      .filter(d => Number(d.dia) <= hoje)
+      .reduce((acc, d) => acc + Number(d.meta_valor || 0), 0);
+
+    // 2. Meta Total do Mês - com fallback se a API mandar 0
+    const metaTotalApi = Number(metasDistribuida.total_meta_mes) || 0;
+    const metaTotalCalculada = metasDistribuida.dias
+      .reduce((acc, d) => acc + Number(d.meta_valor || 0), 0);
+
+    const metaTotal = metaTotalApi > 0 ? metaTotalApi : metaTotalCalculada;
+
+    // 3. Percentual do mês já passado
+    const diasNoMes = metasDistribuida.dias.length || 30;
+    const percentualMesPassado = (hoje / diasNoMes) * 100;
+
+    // 4. Sazonalidade
+    const sazonalidade = metasDistribuida.sazonalidade_usada || 'PADRAO';
+
+    return {
+      metaAcumuladaAteHoje,
+      metaTotal,
+      percentualMesPassado,
+      sazonalidade,
+      diasPassados: hoje,
+      diasNoMes
+    };
+  }, [metasDistribuida, hoje]);
 
   // Dados do gráfico com casting numérico obrigatório
   const chartData = useMemo(() => {
@@ -282,15 +315,9 @@ export function MetasLojaDetail({
             <h2 className="text-lg font-semibold text-gray-800">{lojaNome}</h2>
             <span className="text-sm text-gray-400">({lojaCodigo})</span>
           </div>
-          <div className="flex items-center gap-2 mt-1">
-            <span className="text-xs text-gray-500">
-              Sazonalidade: {metasDistribuida.sazonalidade_usada || 'N/A'}
-            </span>
-            <span className="text-gray-300">|</span>
-            <span className="text-xs text-gray-500">
-              Meta Total: {formatCurrency(metasDistribuida.total_meta_mes)}
-            </span>
-          </div>
+          <p className="text-xs text-gray-500 mt-1">
+            Dia {hoje} de {kpis?.diasNoMes || 30} ({kpis?.percentualMesPassado.toFixed(0) || 0}% do mês)
+          </p>
         </div>
 
         {/* Switcher de Visualização */}
@@ -319,6 +346,60 @@ export function MetasLojaDetail({
           </button>
         </div>
       </div>
+
+      {/* Cards de KPIs */}
+      {kpis && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* Card 1: Meta do Mês */}
+          <div className="bg-gradient-to-br from-primary-500 to-primary-600 rounded-xl p-4 text-white shadow-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <Target className="w-5 h-5 opacity-80" />
+              <span className="text-sm font-medium opacity-90">Meta do Mês</span>
+            </div>
+            <p className="text-2xl font-bold">{formatCurrency(kpis.metaTotal)}</p>
+            <p className="text-xs opacity-75 mt-1">Valor total a atingir</p>
+          </div>
+
+          {/* Card 2: Meta Esperada Até Hoje */}
+          <div className="bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl p-4 text-white shadow-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <TrendingUp className="w-5 h-5 opacity-80" />
+              <span className="text-sm font-medium opacity-90">Meta Até Hoje</span>
+            </div>
+            <p className="text-2xl font-bold">{formatCurrency(kpis.metaAcumuladaAteHoje)}</p>
+            <p className="text-xs opacity-75 mt-1">
+              Soma sazonal dos dias 1 a {hoje}
+            </p>
+          </div>
+
+          {/* Card 3: Perfil de Sazonalidade */}
+          <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
+            <div className="flex items-center gap-2 mb-2">
+              <Sparkles className="w-5 h-5 text-purple-500" />
+              <span className="text-sm font-medium text-gray-600">Perfil Sazonal</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`px-3 py-1 rounded-full text-sm font-bold ${
+                kpis.sazonalidade === 'PROPRIO'
+                  ? 'bg-purple-100 text-purple-700'
+                  : kpis.sazonalidade === 'REGIONAL'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'bg-gray-100 text-gray-700'
+              }`}>
+                {kpis.sazonalidade}
+              </span>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              {kpis.sazonalidade === 'PROPRIO'
+                ? 'Baseado no histórico desta loja'
+                : kpis.sazonalidade === 'REGIONAL'
+                ? 'Baseado na média da regional'
+                : 'Distribuição uniforme padrão'
+              }
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Card de Pacing */}
       <MetasPacingCard pacing={pacingData} />
