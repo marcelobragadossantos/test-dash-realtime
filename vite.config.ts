@@ -6,6 +6,15 @@ export default defineConfig({
   base: './',
   server: {
     host: true,
-    port: 3000
+    port: 3000,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8000', // Backend Express (server.js)
+        changeOrigin: true,
+        secure: false,
+        // Se o backend não esperar o prefixo /api, descomente a linha abaixo:
+        // rewrite: (path) => path.replace(/^\/api/, '')
+      }
+    }
   }
 })
