@@ -11,9 +11,10 @@ interface VendasListProps {
   sortField: SortField;
   sortOrder: SortOrder;
   isCompactMode: boolean;
+  onCardClick?: (venda: Venda) => void; // Callback opcional para clique no card
 }
 
-export function VendasList({ vendas, isLoading, sortField, sortOrder, isCompactMode }: VendasListProps) {
+export function VendasList({ vendas, isLoading, sortField, sortOrder, isCompactMode, onCardClick }: VendasListProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
 
@@ -237,9 +238,15 @@ export function VendasList({ vendas, isLoading, sortField, sortOrder, isCompactM
           <div
             key={venda.codigo}
             className={`bg-white rounded-lg shadow-md p-4 hover:shadow-lg transition-all duration-300 ease-in-out ${
-              isCompactMode ? 'cursor-pointer' : ''
+              isCompactMode || onCardClick ? 'cursor-pointer' : ''
             }`}
-            onClick={() => isCompactMode && toggleCardExpansion(venda.codigo)}
+            onClick={() => {
+              if (onCardClick) {
+                onCardClick(venda);
+              } else if (isCompactMode) {
+                toggleCardExpansion(venda.codigo);
+              }
+            }}
           >
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-start gap-3 flex-1">
