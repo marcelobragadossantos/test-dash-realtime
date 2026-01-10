@@ -12,7 +12,7 @@ import {
   TooltipItem
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
-import { ArrowLeft, Calendar, List, Store, Info, Loader2, Target, TrendingUp, Sparkles } from 'lucide-react';
+import { ArrowLeft, Calendar, List, Store, Info, Loader2, Target, TrendingUp, Sparkles, Zap } from 'lucide-react';
 import { MetasDistribuidaResponse, MetasViewMode, PacingData } from '../types/metas';
 import { MetasPacingCard } from './MetasPacingCard';
 
@@ -32,32 +32,65 @@ interface MetasLojaDetailProps {
   lojaCodigo: string;
   lojaNome: string;
   metasDistribuida: MetasDistribuidaResponse | undefined;
-  vendasAcumuladas: number; // Vendas realizadas até hoje
+  vendaRealizadaDia: number;       // Venda exclusiva de HOJE
+  vendaRealizadaAcumulada: number; // Venda total do mês até agora (1º até hoje)
   onBack: () => void;
   isLoading?: boolean;
 }
 
 /**
  * Detalhe da loja com gráfico de sazonalidade e switcher calendário/lista
+ * Exibe duas análises distintas:
+ * 1. "Hoje" (Curto Prazo): Meta do Dia vs Venda do Dia
+ * 2. "Ritmo" (Longo Prazo): Meta Acumulada vs Venda Acumulada
  */
 export function MetasLojaDetail({
   lojaCodigo,
   lojaNome,
   metasDistribuida,
-  vendasAcumuladas,
+  vendaRealizadaDia,
+  vendaRealizadaAcumulada,
   onBack,
   isLoading
 }: MetasLojaDetailProps) {
   const [viewMode, setViewMode] = useState<MetasViewMode>('calendario');
   const hoje = new Date().getDate();
 
-  // Calcula dados de pacing com casting numérico
+  // ===== ANÁLISE 1: Desempenho de HOJE (Curto Prazo) =====
+  const performanceHoje = useMemo(() => {
+    if (!metasDistribuida?.dias) return null;
+
+    // Encontra a meta específica do dia atual
+    const diaAtual = metasDistribuida.dias.find(d => Number(d.dia) === hoje);
+    const metaHoje = Number(diaAtual?.meta_valor || 0);
+    const vendaHoje = Number(vendaRealizadaDia) || 0;
+    const delta = vendaHoje - metaHoje;
+    const percentual = metaHoje > 0 ? (delta / metaHoje) * 100 : 0;
+
+    // Status do dia
+    let status: 'acima' | 'abaixo' | 'neutro' = 'neutro';
+    if (percentual >= 5) {
+      status = 'acima';
+    } else if (percentual < -5) {
+      status = 'abaixo';
+    }
+
+    return {
+      meta: metaHoje,
+      realizado: vendaHoje,
+      delta,
+      percentual,
+      status
+    };
+  }, [metasDistribuida, vendaRealizadaDia, hoje]);
+
+  // ===== ANÁLISE 2: Pacing MENSAL (Longo Prazo) =====
   const pacingData: PacingData = useMemo(() => {
     // Proteção contra dados não carregados
     if (!metasDistribuida?.dias) {
       return {
         metaAcumuladaHoje: 0,
-        vendasRealizadasHoje: Number(vendasAcumuladas) || 0,
+        vendasRealizadasHoje: Number(vendaRealizadaAcumulada) || 0,
         diferenca: 0,
         percentualDiferenca: 0,
         status: 'no_prazo' as const,
@@ -69,8 +102,9 @@ export function MetasLojaDetail({
       .filter(d => Number(d.dia) <= hoje)
       .reduce((acc, d) => acc + Number(d.meta_valor || 0), 0);
 
-    const vendasNum = Number(vendasAcumuladas) || 0;
-    const diferenca = vendasNum - metaAcumuladaHoje;
+    // Usa a venda ACUMULADA (não a do dia)
+    const vendasAcumuladas = Number(vendaRealizadaAcumulada) || 0;
+    const diferenca = vendasAcumuladas - metaAcumuladaHoje;
     const percentualDiferenca = metaAcumuladaHoje > 0
       ? (diferenca / metaAcumuladaHoje) * 100
       : 0;
@@ -84,12 +118,12 @@ export function MetasLojaDetail({
 
     return {
       metaAcumuladaHoje,
-      vendasRealizadasHoje: vendasNum,
+      vendasRealizadasHoje: vendasAcumuladas,
       diferenca,
       percentualDiferenca,
       status,
     };
-  }, [metasDistribuida, vendasAcumuladas, hoje]);
+  }, [metasDistribuida, vendaRealizadaAcumulada, hoje]);
 
   // Calcula KPIs do cabeçalho com casting numérico
   const kpis = useMemo(() => {
@@ -133,23 +167,23 @@ export function MetasLojaDetail({
 
     const labels = metasDistribuida.dias.map(d => `Dia ${Number(d.dia)}`);
 
-    // Meta acumulada (sazonal) - CORREÇÃO: usar Number() para evitar concatenação de strings
+    // Meta acumulada (sazonal)
     let acumuladoMeta = 0;
     const metaAcumulada = metasDistribuida.dias.map(d => {
       acumuladoMeta += Number(d.meta_valor || 0);
       return acumuladoMeta;
     });
 
-    // Vendas reais acumuladas (simulação proporcional até hoje)
-    const vendasNum = Number(vendasAcumuladas) || 0;
+    // Vendas reais acumuladas - usa vendaRealizadaAcumulada
+    const vendasTotal = Number(vendaRealizadaAcumulada) || 0;
     const metaAcumuladaHojeNum = pacingData.metaAcumuladaHoje || 1;
 
     const vendasDiarias = metasDistribuida.dias.map((d, index) => {
       if (Number(d.dia) > hoje) return null; // Dias futuros não têm dados
 
-      // Distribuição proporcional das vendas até hoje
+      // Distribuição proporcional das vendas acumuladas até hoje
       const proporcao = metaAcumulada[index] / metaAcumuladaHojeNum;
-      return vendasNum * proporcao;
+      return vendasTotal * proporcao;
     });
 
     return {
@@ -167,7 +201,7 @@ export function MetasLojaDetail({
           fill: false,
         },
         {
-          label: 'Vendas Realizadas',
+          label: 'Vendas Acumuladas',
           data: vendasDiarias,
           borderColor: 'rgb(34, 197, 94)',
           backgroundColor: 'rgba(34, 197, 94, 0.1)',
@@ -179,7 +213,7 @@ export function MetasLojaDetail({
         },
       ],
     };
-  }, [metasDistribuida, vendasAcumuladas, hoje, pacingData.metaAcumuladaHoje]);
+  }, [metasDistribuida, vendaRealizadaAcumulada, hoje, pacingData.metaAcumuladaHoje]);
 
   const chartOptions = {
     responsive: true,
@@ -347,7 +381,65 @@ export function MetasLojaDetail({
         </div>
       </div>
 
-      {/* Cards de KPIs */}
+      {/* ===== CARD DE DESTAQUE: Desempenho de HOJE ===== */}
+      {performanceHoje && (
+        <div className={`rounded-xl p-5 shadow-lg border-2 ${
+          performanceHoje.status === 'acima'
+            ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200'
+            : performanceHoje.status === 'abaixo'
+            ? 'bg-gradient-to-r from-red-50 to-rose-50 border-red-200'
+            : 'bg-gradient-to-r from-gray-50 to-slate-50 border-gray-200'
+        }`}>
+          <div className="flex items-center gap-2 mb-3">
+            <Zap className={`w-5 h-5 ${
+              performanceHoje.status === 'acima' ? 'text-green-600' :
+              performanceHoje.status === 'abaixo' ? 'text-red-600' : 'text-gray-600'
+            }`} />
+            <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide">
+              Desempenho de Hoje (Dia {hoje})
+            </h3>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            {/* Meta do Dia */}
+            <div className="text-center">
+              <p className="text-xs text-gray-500 mb-1">Meta do Dia</p>
+              <p className="text-lg font-bold text-gray-800">{formatCurrency(performanceHoje.meta)}</p>
+            </div>
+
+            {/* Venda do Dia */}
+            <div className="text-center">
+              <p className="text-xs text-gray-500 mb-1">Venda do Dia</p>
+              <p className={`text-lg font-bold ${
+                performanceHoje.status === 'acima' ? 'text-green-600' :
+                performanceHoje.status === 'abaixo' ? 'text-red-600' : 'text-gray-800'
+              }`}>
+                {formatCurrency(performanceHoje.realizado)}
+              </p>
+            </div>
+
+            {/* Delta / Status */}
+            <div className="text-center">
+              <p className="text-xs text-gray-500 mb-1">Diferença</p>
+              <div className="flex items-center justify-center gap-1">
+                <p className={`text-lg font-bold ${
+                  performanceHoje.delta >= 0 ? 'text-green-600' : 'text-red-600'
+                }`}>
+                  {performanceHoje.delta >= 0 ? '+' : ''}{formatCurrency(performanceHoje.delta)}
+                </p>
+              </div>
+              <span className={`text-xs font-medium ${
+                performanceHoje.status === 'acima' ? 'text-green-600' :
+                performanceHoje.status === 'abaixo' ? 'text-red-600' : 'text-gray-500'
+              }`}>
+                ({performanceHoje.percentual >= 0 ? '+' : ''}{performanceHoje.percentual.toFixed(1)}%)
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cards de KPIs - Metas do Mês */}
       {kpis && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {/* Card 1: Meta do Mês */}
@@ -401,7 +493,7 @@ export function MetasLojaDetail({
         </div>
       )}
 
-      {/* Card de Pacing */}
+      {/* Card de Pacing MENSAL (Ritmo do Mês) */}
       <MetasPacingCard pacing={pacingData} />
 
       {/* Visualização baseada no modo */}
@@ -410,9 +502,9 @@ export function MetasLojaDetail({
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="text-sm font-semibold text-gray-700">Meta Sazonal vs Vendas Realizadas</h3>
+              <h3 className="text-sm font-semibold text-gray-700">Meta Sazonal vs Vendas Acumuladas</h3>
               <p className="text-xs text-gray-500 mt-0.5">
-                Linha tracejada: meta acumulada | Linha sólida: vendas realizadas
+                Linha tracejada: meta acumulada | Linha sólida: vendas acumuladas
               </p>
             </div>
             <div className="flex items-center gap-1 text-xs text-gray-400">

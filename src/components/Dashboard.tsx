@@ -97,6 +97,18 @@ export function Dashboard() {
     selectedLoja !== null
   );
 
+  // ===== QUERIES SEPARADAS PARA METAS: Vendas do Dia vs Acumuladas =====
+  // Query para vendas de HOJE (usado no card "Desempenho de Hoje")
+  const queryVendasHoje = useVendas({
+    data: format(new Date(), 'yyyy-MM-dd'),
+  });
+
+  // Query para vendas do MÊS até hoje (usado no card "Ritmo do Mês")
+  const queryVendasMesAcumulado = useVendas({
+    data_inicio: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
+    data_fim: format(new Date(), 'yyyy-MM-dd'),
+  });
+
   // Verificar permissões de guias
   const canViewIndicadores = !userPermissions || userPermissions.tabs.includes('indicadores');
   const canViewMonitor = !userPermissions || userPermissions.tabs.includes('monitor');
@@ -193,12 +205,22 @@ export function Dashboard() {
     return vendas;
   }, [queryIndicadores.data?.vendas, userPermissions]);
 
-  // Calcula vendas acumuladas da loja selecionada (para pacing)
+  // ===== CÁLCULOS SEPARADOS PARA METAS =====
+  // Calcula venda do DIA da loja selecionada (para "Desempenho de Hoje")
+  const vendasLojaDia = useMemo(() => {
+    if (!selectedLoja) return 0;
+    const vendas = queryVendasHoje.data?.vendas || [];
+    const venda = vendas.find(v => v.codigo === selectedLoja.codigo);
+    return Number(venda?.venda_total || 0);
+  }, [selectedLoja, queryVendasHoje.data?.vendas]);
+
+  // Calcula vendas ACUMULADAS da loja selecionada (para "Ritmo do Mês")
   const vendasLojaAcumuladas = useMemo(() => {
     if (!selectedLoja) return 0;
-    const venda = filteredVendas.find(v => v.codigo === selectedLoja.codigo);
-    return venda?.venda_total || 0;
-  }, [selectedLoja, filteredVendas]);
+    const vendas = queryVendasMesAcumulado.data?.vendas || [];
+    const venda = vendas.find(v => v.codigo === selectedLoja.codigo);
+    return Number(venda?.venda_total || 0);
+  }, [selectedLoja, queryVendasMesAcumulado.data?.vendas]);
 
   // Refetch quando muda data ou viewMode
   useEffect(() => {
@@ -737,7 +759,8 @@ export function Dashboard() {
                 lojaCodigo={selectedLoja.codigo}
                 lojaNome={selectedLoja.nome}
                 metasDistribuida={queryMetasDistribuida.data}
-                vendasAcumuladas={vendasLojaAcumuladas}
+                vendaRealizadaDia={vendasLojaDia}
+                vendaRealizadaAcumulada={vendasLojaAcumuladas}
                 onBack={handleBackToRanking}
                 isLoading={queryMetasDistribuida.isLoading}
               />
