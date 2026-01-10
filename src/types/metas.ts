@@ -7,6 +7,7 @@
 export interface MetaDia {
   dia: number;
   meta_valor: number;
+  super_meta_valor?: number;
   peso_aplicado: number;
 }
 

@@ -5,10 +5,19 @@ import {
   MetasRegionalParams
 } from '../types/metas';
 
-// Se VITE_BACKEND_URL estiver definido, usa ele (para acesso via proxy do portal)
-// Caso contrário, usa caminho relativo /api (para acesso direto)
+// Configuração de URL Base
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL?.replace(/\/$/, '');
 const API_PROXY_BASE = BACKEND_URL ? `${BACKEND_URL}/api` : '/api';
+
+/**
+ * Helper para extrair o dia (number) de uma string de data "YYYY-MM-DD"
+ */
+function extrairDiaDeData(dataStr: string): number {
+  if (!dataStr) return 0;
+  // Espera formato "2026-01-05" -> retorna 5
+  const parts = dataStr.split('-');
+  return parts.length === 3 ? parseInt(parts[2], 10) : 0;
+}
 
 /**
  * Busca a meta distribuída (dia a dia) de uma loja específica
@@ -34,7 +43,28 @@ export async function fetchMetasDistribuida(
     throw new Error(`Erro ao buscar metas distribuídas: ${response.status} ${response.statusText}`);
   }
 
-  return response.json();
+  const rawData = await response.json();
+
+  // --- ADAPTER LAYER ---
+  // Normaliza os dados da API (snake_case ou nomes diferentes) para a Interface do Frontend
+  return {
+    // Mantém campos compatíveis
+    dias: Array.isArray(rawData.dias) ? rawData.dias.map((d: any) => ({
+      // Prioriza 'dia' se existir, senão extrai de 'data'
+      dia: d.dia || extrairDiaDeData(d.data),
+
+      meta_valor: Number(d.meta_valor || 0),
+      super_meta_valor: Number(d.super_meta_valor || 0),
+
+      // Mapeia 'peso' (API) para 'peso_aplicado' (Front)
+      peso_aplicado: Number(d.peso_aplicado || d.peso || 0)
+    })) : [],
+
+    // Mapeia 'meta_mes_total' (API) para 'total_meta_mes' (Front)
+    total_meta_mes: Number(rawData.total_meta_mes || rawData.meta_mes_total || 0),
+
+    sazonalidade_usada: rawData.sazonalidade_usada || 'PADRAO'
+  };
 }
 
 /**
