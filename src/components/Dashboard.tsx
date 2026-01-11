@@ -9,17 +9,24 @@ import {
   BarChart3,
   Activity,
   Loader2,
-  Shield
+  Shield,
+  ArrowLeft
 } from 'lucide-react';
 import { DateNavigator } from './DateNavigator';
 import { VendasList } from './VendasList';
 import { SyncList } from './SyncList';
 import { RLSTab } from './RLSTab';
+import { MetasRanking } from './MetasRanking';
+import { MetasLojaDetail } from './MetasLojaDetail';
+import { NavigationChoiceModal, NavigationChoice } from './NavigationChoiceModal';
 import { useVendas } from '../hooks/useVendas';
 import { useSyncStatus } from '../hooks/useSyncStatus';
+import { useMetasRegional } from '../hooks/useMetasRegional';
+import { useMetasDistribuida } from '../hooks/useMetasDistribuida';
+import { useVendasDiarias } from '../hooks/useVendasDiarias';
 import { usePortalGatewayUser } from '../hooks/usePortalGatewayUser';
 import { useUserPermissions } from '../hooks/useUserPermissions';
-import { ViewMode } from '../types/api';
+import { ViewMode, Venda } from '../types/api';
 
 // Configuração: tempo mínimo de loading em milissegundos (5 segundos)
 const MIN_LOADING_TIME = 5000;
@@ -30,6 +37,12 @@ const RLS_ADMIN_USER_ID = 4;
 type SortField = 'venda_total' | 'total_quantidade' | 'numero_vendas' | 'ticket_medio' | 'cmv' | 'margem';
 type SortOrder = 'asc' | 'desc';
 type ActiveTab = 'indicadores' | 'monitor' | 'rls';
+
+// Modo de visualização de metas (para navegação via modal)
+type MetasViewMode = 'VENDAS' | 'METAS_LOJA' | 'METAS_REGIONAL';
+
+// Feature flag: ID do usuário que pode ver funcionalidade de Metas (hardcoded para teste)
+const METAS_FEATURE_USER_ID = 4;
 
 export function Dashboard() {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -43,6 +56,18 @@ export function Dashboard() {
   const [loadingStartTime] = useState(() => Date.now());
   const sortMenuRef = useRef<HTMLDivElement>(null);
 
+  // Estado para drill-down de Metas (loja selecionada)
+  const [selectedLoja, setSelectedLoja] = useState<{ codigo: string; nome: string; regional: string } | null>(null);
+
+  // Estado para modo de visualização de metas (navegação via modal)
+  const [metasViewMode, setMetasViewMode] = useState<MetasViewMode>('VENDAS');
+
+  // Estado para filtro regional (quando user escolhe "Analisar Regional")
+  const [selectedRegional, setSelectedRegional] = useState<string | null>(null);
+
+  // Estado para o modal de escolha de navegação
+  const [modalLoja, setModalLoja] = useState<Venda | null>(null);
+
   // Portal Gateway - dados do usuário
   const portalUser = usePortalGatewayUser();
   const welcomeMessage = portalUser?.userName
@@ -54,6 +79,42 @@ export function Dashboard() {
 
   // Verificar se usuário é admin RLS (pode ver a guia de permissões)
   const isRLSAdmin = portalUser?.userId === RLS_ADMIN_USER_ID;
+
+  // Feature flag: verificar se usuário pode ver a aba Metas
+  const canViewMetas = portalUser?.userId === METAS_FEATURE_USER_ID;
+
+  // Parâmetros para queries de Metas (baseado na data atual)
+  const metasParams = {
+    ano: currentDate.getFullYear(),
+    mes: currentDate.getMonth() + 1,
+  };
+
+  // Query para metas regionais (visão geral - todas as lojas)
+  const queryMetasRegional = useMetasRegional(metasParams);
+
+  // Query para metas distribuídas (detalhe da loja selecionada)
+  const queryMetasDistribuida = useMetasDistribuida(
+    selectedLoja ? { store_codigo: selectedLoja.codigo, ...metasParams } : null,
+    selectedLoja !== null
+  );
+
+  // Query para histórico de vendas diárias (via cache Redis)
+  const queryVendasDiarias = useVendasDiarias(
+    selectedLoja ? { store_codigo: selectedLoja.codigo, ...metasParams } : null,
+    selectedLoja !== null
+  );
+
+  // ===== QUERIES SEPARADAS PARA METAS: Vendas do Dia vs Acumuladas =====
+  // Query para vendas de HOJE (usado no card "Desempenho de Hoje")
+  const queryVendasHoje = useVendas({
+    data: format(new Date(), 'yyyy-MM-dd'),
+  });
+
+  // Query para vendas do MÊS até hoje (usado no card "Ritmo do Mês")
+  const queryVendasMesAcumulado = useVendas({
+    data_inicio: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
+    data_fim: format(new Date(), 'yyyy-MM-dd'),
+  });
 
   // Verificar permissões de guias
   const canViewIndicadores = !userPermissions || userPermissions.tabs.includes('indicadores');
@@ -151,6 +212,23 @@ export function Dashboard() {
     return vendas;
   }, [queryIndicadores.data?.vendas, userPermissions]);
 
+  // ===== CÁLCULOS SEPARADOS PARA METAS =====
+  // Calcula venda do DIA da loja selecionada (para "Desempenho de Hoje")
+  const vendasLojaDia = useMemo(() => {
+    if (!selectedLoja) return 0;
+    const vendas = queryVendasHoje.data?.vendas || [];
+    const venda = vendas.find(v => v.codigo === selectedLoja.codigo);
+    return Number(venda?.venda_total || 0);
+  }, [selectedLoja, queryVendasHoje.data?.vendas]);
+
+  // Calcula vendas ACUMULADAS da loja selecionada (para "Ritmo do Mês")
+  const vendasLojaAcumuladas = useMemo(() => {
+    if (!selectedLoja) return 0;
+    const vendas = queryVendasMesAcumulado.data?.vendas || [];
+    const venda = vendas.find(v => v.codigo === selectedLoja.codigo);
+    return Number(venda?.venda_total || 0);
+  }, [selectedLoja, queryVendasMesAcumulado.data?.vendas]);
+
   // Refetch quando muda data ou viewMode
   useEffect(() => {
     queryIndicadores.refetch();
@@ -172,9 +250,15 @@ export function Dashboard() {
     }
   }, [isInitialLoading, loadingStartTime]);
 
-  // Handler para atualizar dados - chama apenas a query da aba ativa
+  // Handler para atualizar dados - chama apenas a query da aba/view ativa
   const handleRefresh = () => {
-    if (activeTab === 'indicadores') {
+    if (metasViewMode !== 'VENDAS') {
+      // Está em modo de metas
+      queryMetasRegional.refetch();
+      if (selectedLoja) {
+        queryMetasDistribuida.refetch();
+      }
+    } else if (activeTab === 'indicadores') {
       queryIndicadores.refetch();
     } else if (activeTab === 'monitor') {
       querySyncStatus.refetch();
@@ -182,12 +266,84 @@ export function Dashboard() {
     // RLS não precisa de refresh manual
   };
 
-  // Verifica se está carregando (baseado na aba ativa)
-  const isRefreshing = activeTab === 'indicadores'
+  // Handler para selecionar loja no ranking de metas
+  const handleSelectLoja = (lojaCodigo: string, lojaNome: string) => {
+    const venda = filteredVendas.find(v => v.codigo === lojaCodigo);
+    setSelectedLoja({ codigo: lojaCodigo, nome: lojaNome, regional: venda?.regional || '' });
+  };
+
+  // Handler para voltar ao ranking de metas
+  const handleBackToRanking = () => {
+    setSelectedLoja(null);
+  };
+
+  // Handler para clique no card da loja (abre modal para user.id === 4)
+  const handleCardClick = canViewMetas ? (venda: Venda) => {
+    setModalLoja(venda);
+  } : undefined;
+
+  // Handler para escolha no modal de navegação
+  const handleNavigationChoice = (choice: NavigationChoice) => {
+    if (!modalLoja) return;
+
+    switch (choice) {
+      case 'vendas':
+        // Fecha modal e mantém na visão atual
+        setModalLoja(null);
+        break;
+      case 'metas_loja':
+        // Vai para metas da loja específica
+        setSelectedLoja({
+          codigo: modalLoja.codigo,
+          nome: modalLoja.loja,
+          regional: modalLoja.regional
+        });
+        setSelectedRegional(null);
+        setMetasViewMode('METAS_LOJA');
+        setModalLoja(null);
+        break;
+      case 'metas_regional':
+        // Vai para metas da regional
+        setSelectedLoja(null);
+        setSelectedRegional(modalLoja.regional);
+        setMetasViewMode('METAS_REGIONAL');
+        setModalLoja(null);
+        break;
+    }
+  };
+
+  // Handler para voltar para vendas (sai do modo metas)
+  const handleBackToVendas = () => {
+    setMetasViewMode('VENDAS');
+    setSelectedLoja(null);
+    setSelectedRegional(null);
+  };
+
+  // Verifica se está carregando (baseado na aba/view ativa)
+  const isRefreshing = metasViewMode !== 'VENDAS'
+    ? queryMetasRegional.isFetching || queryMetasDistribuida.isFetching
+    : activeTab === 'indicadores'
     ? queryIndicadores.isFetching
     : activeTab === 'monitor'
     ? querySyncStatus.isFetching
     : false;
+
+  // Filtra vendas por regional quando em modo METAS_REGIONAL
+  const vendasParaRanking = useMemo(() => {
+    if (metasViewMode === 'METAS_REGIONAL' && selectedRegional) {
+      return filteredVendas.filter(v => v.regional === selectedRegional);
+    }
+    return filteredVendas;
+  }, [filteredVendas, metasViewMode, selectedRegional]);
+
+  // Filtra metas por regional quando em modo METAS_REGIONAL
+  const metasParaRanking = useMemo(() => {
+    if (metasViewMode === 'METAS_REGIONAL' && selectedRegional) {
+      const lojasRegional = new Set(vendasParaRanking.map(v => v.codigo));
+      return (queryMetasRegional.data?.metas || []).filter(m => lojasRegional.has(m.loja_codigo));
+    }
+    return queryMetasRegional.data?.metas || [];
+  }, [queryMetasRegional.data?.metas, metasViewMode, selectedRegional, vendasParaRanking]);
 
   // Splash Screen / Loading Screen
   if (isInitialLoading) {
@@ -362,11 +518,12 @@ export function Dashboard() {
           )}
         </div>
 
-        {/* Tabs de Navegação */}
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex border-b border-primary-500/30">
-            {/* Guia Indicadores - verificar permissão */}
-            {canViewIndicadores && (
+        {/* Tabs de Navegação - Oculto quando em modo Metas */}
+        {metasViewMode === 'VENDAS' ? (
+          <div className="max-w-7xl mx-auto px-4">
+            <div className="flex border-b border-primary-500/30">
+              {/* Guia Indicadores - verificar permissão */}
+              {canViewIndicadores && (
               <button
                 onClick={() => setActiveTab('indicadores')}
                 className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors relative ${
@@ -416,13 +573,38 @@ export function Dashboard() {
                 )}
               </button>
             )}
+              {/* Aba Metas foi removida - acesso via clique no card da loja */}
+            </div>
           </div>
-        </div>
+        ) : (
+          /* Barra de navegação especial para modo Metas */
+          <div className="max-w-7xl mx-auto px-4">
+            <div className="flex items-center py-3 border-b border-primary-500/30">
+              <button
+                onClick={handleBackToVendas}
+                className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Voltar para Vendas</span>
+              </button>
+              <div className="ml-4 text-white">
+                <span className="text-sm font-medium">
+                  {metasViewMode === 'METAS_LOJA' && selectedLoja
+                    ? `Metas: ${selectedLoja.nome}`
+                    : metasViewMode === 'METAS_REGIONAL' && selectedRegional
+                    ? `Metas: Regional ${selectedRegional}`
+                    : 'Metas & Performance'
+                  }
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-6">
-        {/* Conteúdo da Aba Indicadores */}
-        {activeTab === 'indicadores' && (
+        {/* Conteúdo da Aba Indicadores - Oculto quando em modo Metas */}
+        {activeTab === 'indicadores' && metasViewMode === 'VENDAS' && (
           <>
             <DateNavigator
               currentDate={currentDate}
@@ -475,12 +657,13 @@ export function Dashboard() {
               sortField={sortField}
               sortOrder={sortOrder}
               isCompactMode={isCompactMode}
+              onCardClick={handleCardClick}
             />
           </>
         )}
 
-        {/* Conteúdo da Aba Monitor */}
-        {activeTab === 'monitor' && (
+        {/* Conteúdo da Aba Monitor - Oculto quando em modo Metas */}
+        {activeTab === 'monitor' && metasViewMode === 'VENDAS' && (
           <>
             <div className="mb-4">
               <h2 className="text-lg font-semibold text-gray-800">Monitor de Sincronização</h2>
@@ -516,8 +699,8 @@ export function Dashboard() {
           </>
         )}
 
-        {/* Conteúdo da Aba RLS - apenas para admin */}
-        {activeTab === 'rls' && isRLSAdmin && (
+        {/* Conteúdo da Aba RLS - apenas para admin, oculto quando em modo Metas */}
+        {activeTab === 'rls' && isRLSAdmin && metasViewMode === 'VENDAS' && (
           <RLSTab
             availableStores={queryIndicadores.data?.vendas.map(v => ({
               codigo: v.codigo,
@@ -526,7 +709,84 @@ export function Dashboard() {
             })) || []}
           />
         )}
+
+        {/* Conteúdo de Metas - Acessado via modal de navegação */}
+        {metasViewMode !== 'VENDAS' && canViewMetas && (
+          <>
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold text-gray-800">
+                {metasViewMode === 'METAS_LOJA' && selectedLoja
+                  ? 'Análise de Metas da Loja'
+                  : metasViewMode === 'METAS_REGIONAL' && selectedRegional
+                  ? `Ranking Regional: ${selectedRegional}`
+                  : 'Metas & Performance'
+                }
+              </h2>
+              <p className="text-sm text-gray-500">
+                {metasViewMode === 'METAS_LOJA' && selectedLoja
+                  ? 'Análise de sazonalidade e ritmo de vendas'
+                  : `Ranking de lojas - ${new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(currentDate)}`
+                }
+              </p>
+            </div>
+
+            {queryMetasRegional.error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h3 className="font-semibold text-red-800 mb-1">Erro ao carregar metas</h3>
+                    <p className="text-sm text-red-600">
+                      {queryMetasRegional.error instanceof Error ? queryMetasRegional.error.message : 'Ocorreu um erro desconhecido'}
+                    </p>
+                    <button
+                      onClick={() => queryMetasRegional.refetch()}
+                      className="mt-2 text-sm font-medium text-red-700 hover:text-red-800 underline"
+                    >
+                      Tentar novamente
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Visão Ranking (METAS_REGIONAL ou quando não há loja selecionada em METAS_LOJA) */}
+            {(metasViewMode === 'METAS_REGIONAL' || (metasViewMode === 'METAS_LOJA' && !selectedLoja)) && (
+              <MetasRanking
+                metas={metasParaRanking}
+                vendas={vendasParaRanking}
+                onSelectLoja={handleSelectLoja}
+                isLoading={queryMetasRegional.isLoading}
+              />
+            )}
+
+            {/* Visão Detalhe (quando loja selecionada em METAS_LOJA) */}
+            {metasViewMode === 'METAS_LOJA' && selectedLoja && (
+              <MetasLojaDetail
+                lojaCodigo={selectedLoja.codigo}
+                lojaNome={selectedLoja.nome}
+                metasDistribuida={queryMetasDistribuida.data}
+                historicoVendas={queryVendasDiarias.data}
+                vendaRealizadaDia={vendasLojaDia}
+                vendaRealizadaAcumulada={vendasLojaAcumuladas}
+                dataVisualizacao={currentDate}
+                onBack={handleBackToRanking}
+                isLoading={queryMetasDistribuida.isLoading || queryVendasDiarias.isLoading}
+              />
+            )}
+          </>
+        )}
       </main>
+
+      {/* Modal de Escolha de Navegação */}
+      <NavigationChoiceModal
+        isOpen={modalLoja !== null}
+        lojaNome={modalLoja?.loja || ''}
+        lojaCodigo={modalLoja?.codigo || ''}
+        regional={modalLoja?.regional || ''}
+        onClose={() => setModalLoja(null)}
+        onChoose={handleNavigationChoice}
+      />
     </div>
   );
 }
