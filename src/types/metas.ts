@@ -98,3 +98,50 @@ export interface PacingData {
   percentualDiferenca: number; // % em relação à meta esperada
   status: PerformanceStatus;
 }
+
+// ===== TIPOS PARA VENDAS DIÁRIAS (Histórico via Cache) =====
+
+/**
+ * Venda de um dia específico
+ * Usado no endpoint /metas/vendas-diarias
+ */
+export interface VendaDiaria {
+  data: string;      // "2026-01-05"
+  dia: number;       // 5
+  venda_total: number;
+}
+
+/**
+ * Resposta do endpoint /metas/vendas-diarias
+ * Histórico de vendas fechado (dia 1 até ontem) via cache Redis
+ */
+export interface VendasDiariasResponse {
+  store_codigo: string;
+  ano: number;
+  mes: number;
+  dias: VendaDiaria[];
+  total_periodo: number;
+  processado_em: string;
+}
+
+/**
+ * Parâmetros para buscar vendas diárias
+ */
+export interface VendasDiariasParams {
+  store_codigo: string;
+  ano: number;
+  mes: number;
+}
+
+/**
+ * Dados combinados (Meta + Venda) para renderização
+ * Fusão do histórico (cache) com dia atual (realtime)
+ */
+export interface DadoCombinado {
+  dia: number;
+  meta_valor: number;
+  peso_aplicado: number;
+  venda_realizada: number;
+  diferenca: number;
+  exibir_venda: boolean; // true se dia <= hoje
+}

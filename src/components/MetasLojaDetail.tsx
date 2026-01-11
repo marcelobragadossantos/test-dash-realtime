@@ -13,7 +13,7 @@ import {
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 import { ArrowLeft, Calendar, List, Store, Info, Loader2, Target, TrendingUp, Sparkles, Zap } from 'lucide-react';
-import { MetasDistribuidaResponse, MetasViewMode, PacingData } from '../types/metas';
+import { MetasDistribuidaResponse, MetasViewMode, PacingData, VendasDiariasResponse, DadoCombinado } from '../types/metas';
 import { MetasPacingCard } from './MetasPacingCard';
 
 // Registrar componentes do Chart.js
@@ -32,7 +32,8 @@ interface MetasLojaDetailProps {
   lojaCodigo: string;
   lojaNome: string;
   metasDistribuida: MetasDistribuidaResponse | undefined;
-  vendaRealizadaDia: number;       // Venda exclusiva de HOJE
+  historicoVendas: VendasDiariasResponse | undefined; // Histórico de vendas (cache Redis)
+  vendaRealizadaDia: number;       // Venda exclusiva de HOJE (realtime)
   vendaRealizadaAcumulada: number; // Venda total do mês até agora (1º até hoje)
   onBack: () => void;
   isLoading?: boolean;
@@ -43,11 +44,16 @@ interface MetasLojaDetailProps {
  * Exibe duas análises distintas:
  * 1. "Hoje" (Curto Prazo): Meta do Dia vs Venda do Dia
  * 2. "Ritmo" (Longo Prazo): Meta Acumulada vs Venda Acumulada
+ *
+ * Fusão de Dados:
+ * - Dias passados: Histórico do cache Redis (useVendasDiarias)
+ * - Dia atual (hoje): Realtime (vendaRealizadaDia)
  */
 export function MetasLojaDetail({
   lojaCodigo,
   lojaNome,
   metasDistribuida,
+  historicoVendas,
   vendaRealizadaDia,
   vendaRealizadaAcumulada,
   onBack,
@@ -55,6 +61,38 @@ export function MetasLojaDetail({
 }: MetasLojaDetailProps) {
   const [viewMode, setViewMode] = useState<MetasViewMode>('calendario');
   const hoje = new Date().getDate();
+
+  // ===== DATA FUSION: Combina Metas + Histórico + Realtime =====
+  const dadosCombinados: DadoCombinado[] = useMemo(() => {
+    if (!metasDistribuida?.dias) return [];
+
+    return metasDistribuida.dias.map(meta => {
+      const diaNum = Number(meta.dia);
+
+      // Tenta achar venda no histórico (dias passados - via cache Redis)
+      const vendaHistorica = historicoVendas?.dias?.find(v => Number(v.dia) === diaNum);
+
+      // Se for o dia de HOJE, usa a prop realtime. Se for passado, usa histórico.
+      let vendaValor = 0;
+      if (diaNum === hoje) {
+        vendaValor = Number(vendaRealizadaDia) || 0;
+      } else if (vendaHistorica) {
+        vendaValor = Number(vendaHistorica.venda_total) || 0;
+      }
+
+      const metaValor = Number(meta.meta_valor) || 0;
+      const diferenca = vendaValor - metaValor;
+
+      return {
+        dia: diaNum,
+        meta_valor: metaValor,
+        peso_aplicado: Number(meta.peso_aplicado) || 0,
+        venda_realizada: vendaValor,
+        diferenca,
+        exibir_venda: diaNum <= hoje // Só exibe venda se o dia já passou ou é hoje
+      };
+    });
+  }, [metasDistribuida, historicoVendas, vendaRealizadaDia, hoje]);
 
   // ===== ANÁLISE 1: Desempenho de HOJE (Curto Prazo) =====
   const performanceHoje = useMemo(() => {
@@ -102,9 +140,15 @@ export function MetasLojaDetail({
       .filter(d => Number(d.dia) <= hoje)
       .reduce((acc, d) => acc + Number(d.meta_valor || 0), 0);
 
-    // Usa a venda ACUMULADA (não a do dia)
-    const vendasAcumuladas = Number(vendaRealizadaAcumulada) || 0;
-    const diferenca = vendasAcumuladas - metaAcumuladaHoje;
+    // Calcula vendas acumuladas usando dados combinados (mais preciso)
+    const vendasAcumuladas = dadosCombinados
+      .filter(d => d.exibir_venda)
+      .reduce((acc, d) => acc + d.venda_realizada, 0);
+
+    // Fallback para vendaRealizadaAcumulada se dadosCombinados estiver vazio
+    const vendasFinal = vendasAcumuladas > 0 ? vendasAcumuladas : Number(vendaRealizadaAcumulada) || 0;
+
+    const diferenca = vendasFinal - metaAcumuladaHoje;
     const percentualDiferenca = metaAcumuladaHoje > 0
       ? (diferenca / metaAcumuladaHoje) * 100
       : 0;
@@ -118,12 +162,12 @@ export function MetasLojaDetail({
 
     return {
       metaAcumuladaHoje,
-      vendasRealizadasHoje: vendasAcumuladas,
+      vendasRealizadasHoje: vendasFinal,
       diferenca,
       percentualDiferenca,
       status,
     };
-  }, [metasDistribuida, vendaRealizadaAcumulada, hoje]);
+  }, [metasDistribuida, vendaRealizadaAcumulada, hoje, dadosCombinados]);
 
   // Calcula KPIs do cabeçalho com casting numérico
   const kpis = useMemo(() => {
@@ -158,32 +202,28 @@ export function MetasLojaDetail({
     };
   }, [metasDistribuida, hoje]);
 
-  // Dados do gráfico com casting numérico obrigatório
+  // Dados do gráfico usando dados combinados reais
   const chartData = useMemo(() => {
     // Proteção contra crash - verifica se dados existem
     if (!metasDistribuida?.dias || metasDistribuida.dias.length === 0) {
       return null;
     }
 
-    const labels = metasDistribuida.dias.map(d => `Dia ${Number(d.dia)}`);
+    const labels = dadosCombinados.map(d => `Dia ${d.dia}`);
 
     // Meta acumulada (sazonal)
     let acumuladoMeta = 0;
-    const metaAcumulada = metasDistribuida.dias.map(d => {
-      acumuladoMeta += Number(d.meta_valor || 0);
+    const metaAcumulada = dadosCombinados.map(d => {
+      acumuladoMeta += d.meta_valor;
       return acumuladoMeta;
     });
 
-    // Vendas reais acumuladas - usa vendaRealizadaAcumulada
-    const vendasTotal = Number(vendaRealizadaAcumulada) || 0;
-    const metaAcumuladaHojeNum = pacingData.metaAcumuladaHoje || 1;
-
-    const vendasDiarias = metasDistribuida.dias.map((d, index) => {
-      if (Number(d.dia) > hoje) return null; // Dias futuros não têm dados
-
-      // Distribuição proporcional das vendas acumuladas até hoje
-      const proporcao = metaAcumulada[index] / metaAcumuladaHojeNum;
-      return vendasTotal * proporcao;
+    // Vendas reais acumuladas - usando dados combinados (histórico + realtime)
+    let acumuladoVendas = 0;
+    const vendasAcumuladas = dadosCombinados.map(d => {
+      if (!d.exibir_venda) return null; // Dias futuros não têm dados
+      acumuladoVendas += d.venda_realizada;
+      return acumuladoVendas;
     });
 
     return {
@@ -201,8 +241,8 @@ export function MetasLojaDetail({
           fill: false,
         },
         {
-          label: 'Vendas Acumuladas',
-          data: vendasDiarias,
+          label: 'Vendas Acumuladas (Real)',
+          data: vendasAcumuladas,
           borderColor: 'rgb(34, 197, 94)',
           backgroundColor: 'rgba(34, 197, 94, 0.1)',
           borderWidth: 3,
@@ -213,7 +253,7 @@ export function MetasLojaDetail({
         },
       ],
     };
-  }, [metasDistribuida, vendaRealizadaAcumulada, hoje, pacingData.metaAcumuladaHoje]);
+  }, [metasDistribuida, dadosCombinados]);
 
   const chartOptions = {
     responsive: true,
@@ -331,6 +371,19 @@ export function MetasLojaDetail({
       </div>
     );
   }
+
+  // Calcula totais para o footer da tabela
+  const totais = useMemo(() => {
+    const totalMeta = dadosCombinados.reduce((acc, d) => acc + d.meta_valor, 0);
+    const totalRealizado = dadosCombinados
+      .filter(d => d.exibir_venda)
+      .reduce((acc, d) => acc + d.venda_realizada, 0);
+    const totalDiferenca = totalRealizado - dadosCombinados
+      .filter(d => d.exibir_venda)
+      .reduce((acc, d) => acc + d.meta_valor, 0);
+
+    return { totalMeta, totalRealizado, totalDiferenca };
+  }, [dadosCombinados]);
 
   return (
     <div className="space-y-6">
@@ -502,9 +555,9 @@ export function MetasLojaDetail({
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="text-sm font-semibold text-gray-700">Meta Sazonal vs Vendas Acumuladas</h3>
+              <h3 className="text-sm font-semibold text-gray-700">Meta Sazonal vs Vendas Reais</h3>
               <p className="text-xs text-gray-500 mt-0.5">
-                Linha tracejada: meta acumulada | Linha sólida: vendas acumuladas
+                Linha tracejada: meta acumulada | Linha sólida: vendas reais acumuladas
               </p>
             </div>
             <div className="flex items-center gap-1 text-xs text-gray-400">
@@ -524,45 +577,40 @@ export function MetasLojaDetail({
           </div>
         </div>
       ) : (
-        /* Lista detalhada dia a dia */
+        /* Lista detalhada dia a dia com dados reais */
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
             <h3 className="text-sm font-semibold text-gray-700">Detalhamento Dia a Dia</h3>
-            <p className="text-xs text-gray-500 mt-0.5">Meta sazonal distribuída por dia</p>
+            <p className="text-xs text-gray-500 mt-0.5">Meta sazonal e vendas reais por dia</p>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Dia</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600">Meta do Dia</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600">Peso</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600">Meta Acumulada</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-gray-600">Status</th>
+                  <th className="px-3 py-3 text-left text-xs font-semibold text-gray-600">Dia</th>
+                  <th className="px-3 py-3 text-right text-xs font-semibold text-gray-600">Meta</th>
+                  <th className="px-3 py-3 text-right text-xs font-semibold text-gray-600">Realizado</th>
+                  <th className="px-3 py-3 text-right text-xs font-semibold text-gray-600">Diferença</th>
+                  <th className="px-3 py-3 text-right text-xs font-semibold text-gray-600">Peso</th>
+                  <th className="px-3 py-3 text-center text-xs font-semibold text-gray-600">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {metasDistribuida.dias.map((dia, index) => {
-                  // Casting numérico para evitar concatenação de strings
-                  const metaAcumulada = metasDistribuida.dias
-                    .slice(0, index + 1)
-                    .reduce((acc, d) => acc + Number(d.meta_valor || 0), 0);
-
-                  const diaNum = Number(dia.dia);
-                  const isHoje = diaNum === hoje;
-                  const isPassado = diaNum < hoje;
-                  const isFuturo = diaNum > hoje;
+                {dadosCombinados.map((dado) => {
+                  const isHoje = dado.dia === hoje;
+                  const isPassado = dado.dia < hoje;
+                  const isFuturo = dado.dia > hoje;
 
                   return (
                     <tr
-                      key={diaNum}
+                      key={dado.dia}
                       className={`${isHoje ? 'bg-primary-50' : ''} ${isFuturo ? 'opacity-50' : ''}`}
                     >
-                      <td className="px-4 py-3">
+                      <td className="px-3 py-3">
                         <div className="flex items-center gap-2">
                           <span className={`font-medium ${isHoje ? 'text-primary-700' : 'text-gray-800'}`}>
-                            {diaNum}
+                            {dado.dia}
                           </span>
                           {isHoje && (
                             <span className="px-1.5 py-0.5 bg-primary-100 text-primary-700 text-[10px] font-medium rounded">
@@ -571,29 +619,50 @@ export function MetasLojaDetail({
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-3 py-3 text-right">
                         <span className="font-medium text-gray-800">
-                          {formatCurrency(dia.meta_valor)}
+                          {formatCurrency(dado.meta_valor)}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-3 py-3 text-right">
+                        {dado.exibir_venda ? (
+                          <span className={`font-medium ${
+                            dado.diferenca >= 0 ? 'text-green-600' : 'text-red-600'
+                          }`}>
+                            {formatCurrency(dado.venda_realizada)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-3 text-right">
+                        {dado.exibir_venda ? (
+                          <span className={`font-medium ${
+                            dado.diferenca >= 0 ? 'text-green-600' : 'text-red-600'
+                          }`}>
+                            {dado.diferenca >= 0 ? '+' : ''}{formatCurrency(dado.diferenca)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-3 text-right">
                         <span className={`text-sm ${
-                          Number(dia.peso_aplicado) > 1 ? 'text-green-600 font-medium' :
-                          Number(dia.peso_aplicado) < 1 ? 'text-red-600' :
+                          dado.peso_aplicado > 1 ? 'text-green-600 font-medium' :
+                          dado.peso_aplicado < 1 ? 'text-red-600' :
                           'text-gray-600'
                         }`}>
-                          {Number(dia.peso_aplicado || 0).toFixed(2)}x
+                          {dado.peso_aplicado.toFixed(2)}x
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-right">
-                        <span className="text-gray-600">
-                          {formatCurrency(metaAcumulada)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-3 py-3 text-center">
                         {isPassado && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
-                            Concluído
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                            dado.diferenca >= 0
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-red-100 text-red-700'
+                          }`}>
+                            {dado.diferenca >= 0 ? 'Atingido' : 'Abaixo'}
                           </span>
                         )}
                         {isHoje && (
@@ -613,11 +682,20 @@ export function MetasLojaDetail({
               </tbody>
               <tfoot className="bg-gray-50 border-t border-gray-200">
                 <tr>
-                  <td className="px-4 py-3 font-semibold text-gray-700">Total</td>
-                  <td className="px-4 py-3 text-right font-bold text-gray-800" colSpan={3}>
-                    {formatCurrency(metasDistribuida.total_meta_mes)}
+                  <td className="px-3 py-3 font-semibold text-gray-700">Total</td>
+                  <td className="px-3 py-3 text-right font-bold text-gray-800">
+                    {formatCurrency(totais.totalMeta)}
                   </td>
-                  <td></td>
+                  <td className="px-3 py-3 text-right font-bold text-gray-800">
+                    {formatCurrency(totais.totalRealizado)}
+                  </td>
+                  <td className="px-3 py-3 text-right font-bold">
+                    <span className={totais.totalDiferenca >= 0 ? 'text-green-600' : 'text-red-600'}>
+                      {totais.totalDiferenca >= 0 ? '+' : ''}{formatCurrency(totais.totalDiferenca)}
+                    </span>
+                  </td>
+                  <td className="px-3 py-3"></td>
+                  <td className="px-3 py-3"></td>
                 </tr>
               </tfoot>
             </table>

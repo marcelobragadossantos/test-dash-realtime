@@ -23,6 +23,7 @@ import { useVendas } from '../hooks/useVendas';
 import { useSyncStatus } from '../hooks/useSyncStatus';
 import { useMetasRegional } from '../hooks/useMetasRegional';
 import { useMetasDistribuida } from '../hooks/useMetasDistribuida';
+import { useVendasDiarias } from '../hooks/useVendasDiarias';
 import { usePortalGatewayUser } from '../hooks/usePortalGatewayUser';
 import { useUserPermissions } from '../hooks/useUserPermissions';
 import { ViewMode, Venda } from '../types/api';
@@ -93,6 +94,12 @@ export function Dashboard() {
 
   // Query para metas distribuídas (detalhe da loja selecionada)
   const queryMetasDistribuida = useMetasDistribuida(
+    selectedLoja ? { store_codigo: selectedLoja.codigo, ...metasParams } : null,
+    selectedLoja !== null
+  );
+
+  // Query para histórico de vendas diárias (via cache Redis)
+  const queryVendasDiarias = useVendasDiarias(
     selectedLoja ? { store_codigo: selectedLoja.codigo, ...metasParams } : null,
     selectedLoja !== null
   );
@@ -759,10 +766,11 @@ export function Dashboard() {
                 lojaCodigo={selectedLoja.codigo}
                 lojaNome={selectedLoja.nome}
                 metasDistribuida={queryMetasDistribuida.data}
+                historicoVendas={queryVendasDiarias.data}
                 vendaRealizadaDia={vendasLojaDia}
                 vendaRealizadaAcumulada={vendasLojaAcumuladas}
                 onBack={handleBackToRanking}
-                isLoading={queryMetasDistribuida.isLoading}
+                isLoading={queryMetasDistribuida.isLoading || queryVendasDiarias.isLoading}
               />
             )}
           </>

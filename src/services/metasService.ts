@@ -2,7 +2,9 @@ import {
   MetasDistribuidaResponse,
   MetasDistribuidaParams,
   MetasRegionalResponse,
-  MetasRegionalParams
+  MetasRegionalParams,
+  VendasDiariasResponse,
+  VendasDiariasParams
 } from '../types/metas';
 
 // Configuração de URL Base
@@ -91,4 +93,47 @@ export async function fetchMetasRegional(
   }
 
   return response.json();
+}
+
+/**
+ * Busca o histórico de vendas diárias de uma loja (via cache Redis)
+ * Endpoint: GET /metas/vendas-diarias?store_codigo=XXX&ano=2026&mes=1
+ * Retorna vendas fechadas (dia 1 até ontem)
+ */
+export async function fetchVendasDiarias(
+  params: VendasDiariasParams
+): Promise<VendasDiariasResponse> {
+  const url = new URL(`${API_PROXY_BASE}/metas/vendas-diarias`, BACKEND_URL || window.location.origin);
+
+  url.searchParams.append('store_codigo', params.store_codigo);
+  url.searchParams.append('ano', params.ano.toString());
+  url.searchParams.append('mes', params.mes.toString());
+
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Erro ao buscar vendas diárias: ${response.status} ${response.statusText}`);
+  }
+
+  const rawData = await response.json();
+
+  // --- ADAPTER LAYER ---
+  // Normaliza os dados garantindo tipos numéricos
+  return {
+    store_codigo: rawData.store_codigo || params.store_codigo,
+    ano: Number(rawData.ano) || params.ano,
+    mes: Number(rawData.mes) || params.mes,
+    dias: Array.isArray(rawData.dias) ? rawData.dias.map((d: any) => ({
+      data: d.data || '',
+      dia: Number(d.dia) || 0,
+      venda_total: Number(d.venda_total || 0)
+    })) : [],
+    total_periodo: Number(rawData.total_periodo || 0),
+    processado_em: rawData.processado_em || new Date().toISOString()
+  };
 }

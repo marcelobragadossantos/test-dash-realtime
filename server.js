@@ -227,6 +227,38 @@ app.get('/api/metas/distribuida', async (req, res) => {
   }
 });
 
+// Proxy para /metas/vendas-diarias (histórico de vendas diárias via cache Redis)
+app.get('/api/metas/vendas-diarias', async (req, res) => {
+  try {
+    const url = new URL('/metas/vendas-diarias', API_BASE_URL);
+
+    // Repassa query params
+    if (req.query.store_codigo) url.searchParams.append('store_codigo', req.query.store_codigo);
+    if (req.query.ano) url.searchParams.append('ano', req.query.ano);
+    if (req.query.mes) url.searchParams.append('mes', req.query.mes);
+
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: {
+        'X-Secret-Key': API_SECRET_KEY,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      return res.status(response.status).json({
+        error: `Erro ao buscar vendas diárias: ${response.status} ${response.statusText}`,
+      });
+    }
+
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error('Erro no proxy /metas/vendas-diarias:', error);
+    res.status(500).json({ error: 'Erro interno do servidor' });
+  }
+});
+
 // ==========================================
 // RLS (Row-Level Security) Endpoints
 // ==========================================
