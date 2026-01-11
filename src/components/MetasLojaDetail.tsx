@@ -521,11 +521,11 @@ export function MetasLojaDetail({
             </p>
           </div>
 
-          {/* Card 3: Perfil de Sazonalidade */}
+          {/* Card 3: Inteligência da Meta */}
           <div className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
             <div className="flex items-center gap-2 mb-2">
               <Sparkles className="w-5 h-5 text-purple-500" />
-              <span className="text-sm font-medium text-gray-600">Perfil Sazonal</span>
+              <span className="text-sm font-medium text-gray-600">Inteligência da Meta</span>
             </div>
             <div className="flex items-center gap-2">
               <span className={`px-3 py-1 rounded-full text-sm font-bold ${
