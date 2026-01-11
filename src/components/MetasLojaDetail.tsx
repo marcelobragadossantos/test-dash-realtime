@@ -353,16 +353,27 @@ export function MetasLojaDetail({
   };
 
   // Calcula totais para o footer da tabela (DEVE ficar ANTES dos early returns)
+  // Inclui projeção para mostrar previsão de fechamento do mês
   const totais = useMemo(() => {
     const totalMeta = dadosCombinados.reduce((acc, d) => acc + d.meta_valor, 0);
-    const totalRealizado = dadosCombinados
-      .filter(d => d.exibir_venda)
-      .reduce((acc, d) => acc + d.venda_realizada, 0);
-    const totalDiferenca = totalRealizado - dadosCombinados
-      .filter(d => d.exibir_venda)
-      .reduce((acc, d) => acc + d.meta_valor, 0);
 
-    return { totalMeta, totalRealizado, totalDiferenca };
+    // Total realizado até hoje (só histórico + realtime)
+    const totalRealizadoAteHoje = dadosCombinados
+      .filter(d => d.tipo !== 'projecao')
+      .reduce((acc, d) => acc + d.venda_realizada, 0);
+
+    // Previsão de fechamento = Realizado até hoje + Projeção futura
+    const totalProjetado = dadosCombinados.reduce((acc, d) => acc + d.venda_realizada, 0);
+
+    // Diferença baseada na previsão de fechamento
+    const totalDiferenca = totalProjetado - totalMeta;
+
+    return {
+      totalMeta,
+      totalRealizadoAteHoje,  // Para referência
+      totalProjetado,          // Previsão de fechamento (histórico + realtime + projeção)
+      totalDiferenca
+    };
   }, [dadosCombinados]);
 
   const formatCurrency = (value: number | string | undefined | null) => {
@@ -713,6 +724,12 @@ export function MetasLojaDetail({
                         }`}>
                           {formatCurrency(dado.venda_realizada)}
                         </span>
+                        {/* Mostrar projeção para o dia de hoje */}
+                        {isHoje && (
+                          <span className="block text-[10px] text-purple-500">
+                            Proj: {formatCurrency(dado.projecao_estatistica)}
+                          </span>
+                        )}
                       </td>
                       <td className="px-3 py-3 text-right">
                         <span className={`font-medium ${
@@ -722,6 +739,15 @@ export function MetasLojaDetail({
                         }`}>
                           {dado.diferenca >= 0 ? '+' : ''}{formatCurrency(dado.diferenca)}
                         </span>
+                        {/* Mostrar diferença vs projeção para hoje */}
+                        {isHoje && (
+                          <span className={`block text-[10px] ${
+                            dado.venda_realizada >= dado.projecao_estatistica ? 'text-green-500' : 'text-red-500'
+                          }`}>
+                            vs Proj: {dado.venda_realizada >= dado.projecao_estatistica ? '+' : ''}
+                            {formatCurrency(dado.venda_realizada - dado.projecao_estatistica)}
+                          </span>
+                        )}
                       </td>
                       <td className="px-3 py-3 text-right">
                         <span className={`text-sm ${
@@ -759,12 +785,18 @@ export function MetasLojaDetail({
               </tbody>
               <tfoot className="bg-gray-50 border-t border-gray-200">
                 <tr>
-                  <td className="px-3 py-3 font-semibold text-gray-700">Total</td>
+                  <td className="px-3 py-3">
+                    <span className="font-semibold text-gray-700">Previsão</span>
+                    <span className="block text-[10px] text-gray-400">Realizado + Projeção</span>
+                  </td>
                   <td className="px-3 py-3 text-right font-bold text-gray-800">
                     {formatCurrency(totais.totalMeta)}
                   </td>
-                  <td className="px-3 py-3 text-right font-bold text-gray-800">
-                    {formatCurrency(totais.totalRealizado)}
+                  <td className="px-3 py-3 text-right">
+                    <span className="font-bold text-purple-600">{formatCurrency(totais.totalProjetado)}</span>
+                    <span className="block text-[10px] text-gray-400">
+                      Até hoje: {formatCurrency(totais.totalRealizadoAteHoje)}
+                    </span>
                   </td>
                   <td className="px-3 py-3 text-right font-bold">
                     <span className={totais.totalDiferenca >= 0 ? 'text-green-600' : 'text-red-600'}>
