@@ -35,7 +35,6 @@ interface MetasLojaDetailProps {
   historicoVendas: VendasDiariasResponse | undefined; // Histórico de vendas (cache Redis)
   vendaRealizadaDia: number;       // Venda exclusiva de HOJE (realtime)
   vendaRealizadaAcumulada: number; // Venda total do mês até agora (1º até hoje)
-  dataVisualizacao: Date;          // Data que o usuário está visualizando
   onBack: () => void;
   isLoading?: boolean;
 }
@@ -57,7 +56,6 @@ export function MetasLojaDetail({
   historicoVendas,
   vendaRealizadaDia,
   vendaRealizadaAcumulada,
-  dataVisualizacao,
   onBack,
   isLoading
 }: MetasLojaDetailProps) {
