@@ -24,6 +24,10 @@ function extrairDiaDeData(dataStr: string): number {
 /**
  * Busca a meta distribuída (dia a dia) de uma loja específica
  * Endpoint: GET /metas/distribuida?store_codigo=XXX&ano=2026&mes=1
+ *
+ * V3.0: Retorna estrutura unificada com Meta + Histórico + Projeção
+ * - Para dias passados: `venda` é o histórico real
+ * - Para hoje/futuro: `venda` é a projeção estatística
  */
 export async function fetchMetasDistribuida(
   params: MetasDistribuidaParams
@@ -47,19 +51,22 @@ export async function fetchMetasDistribuida(
 
   const rawData = await response.json();
 
-  // --- ADAPTER LAYER ---
+  // --- ADAPTER LAYER V3.0 ---
   // Normaliza os dados da API (snake_case ou nomes diferentes) para a Interface do Frontend
   return {
-    // Mantém campos compatíveis
     dias: Array.isArray(rawData.dias) ? rawData.dias.map((d: any) => ({
       // Prioriza 'dia' se existir, senão extrai de 'data'
       dia: d.dia || extrairDiaDeData(d.data),
 
-      meta_valor: Number(d.meta_valor || 0),
+      // Mapeia 'meta' (API V3.0) para 'meta_valor' (Front)
+      meta_valor: Number(d.meta_valor || d.meta || 0),
       super_meta_valor: Number(d.super_meta_valor || 0),
 
       // Mapeia 'peso' (API) para 'peso_aplicado' (Front)
-      peso_aplicado: Number(d.peso_aplicado || d.peso || 0)
+      peso_aplicado: Number(d.peso_aplicado || d.peso || 0),
+
+      // V3.0: Campo unificado de venda (histórico para passado, projeção para hoje/futuro)
+      venda: Number(d.venda || 0)
     })) : [],
 
     // Mapeia 'meta_mes_total' (API) para 'total_meta_mes' (Front)
