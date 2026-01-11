@@ -769,7 +769,6 @@ export function Dashboard() {
                 historicoVendas={queryVendasDiarias.data}
                 vendaRealizadaDia={vendasLojaDia}
                 vendaRealizadaAcumulada={vendasLojaAcumuladas}
-                dataVisualizacao={currentDate}
                 onBack={handleBackToRanking}
                 isLoading={queryMetasDistribuida.isLoading || queryVendasDiarias.isLoading}
               />
