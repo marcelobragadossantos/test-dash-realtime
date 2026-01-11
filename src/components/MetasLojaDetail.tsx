@@ -63,8 +63,9 @@ export function MetasLojaDetail({
 }: MetasLojaDetailProps) {
   const [viewMode, setViewMode] = useState<MetasViewMode>('calendario');
 
-  // Usa a data de visualização passada pelo Dashboard (não a data do sistema)
-  const hoje = dataVisualizacao.getDate();
+  // SEMPRE usa a data atual do sistema (independente da data que o usuário está visualizando)
+  // A análise de metas é sempre até o dia ATUAL, não muda com a navegação do usuário
+  const hoje = new Date().getDate();
 
   // ===== DATA FUSION: Combina Metas + Histórico + Realtime =====
   const dadosCombinados: DadoCombinado[] = useMemo(() => {
@@ -189,9 +190,18 @@ export function MetasLojaDetail({
 
     const metaTotal = metaTotalApi > 0 ? metaTotalApi : metaTotalCalculada;
 
-    // 3. Percentual do mês já passado
+    // 3. Percentual do mês já passado (baseado na SOMA DOS PESOS, não simples contagem de dias)
     const diasNoMes = metasDistribuida.dias.length || 30;
-    const percentualMesPassado = (hoje / diasNoMes) * 100;
+
+    const pesoAcumuladoHoje = metasDistribuida.dias
+      .filter(d => Number(d.dia) <= hoje)
+      .reduce((acc, d) => acc + Number(d.peso_aplicado || 0), 0);
+
+    const pesoTotal = metasDistribuida.dias
+      .reduce((acc, d) => acc + Number(d.peso_aplicado || 0), 0);
+
+    // Percentual baseado em pesos (ex: se fins de semana têm peso maior, eles contam mais)
+    const percentualMesPassado = pesoTotal > 0 ? (pesoAcumuladoHoje / pesoTotal) * 100 : 0;
 
     // 4. Sazonalidade
     const sazonalidade = metasDistribuida.sazonalidade_usada || 'PADRAO';
