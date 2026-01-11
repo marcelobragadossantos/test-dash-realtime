@@ -23,7 +23,6 @@ import { useVendas } from '../hooks/useVendas';
 import { useSyncStatus } from '../hooks/useSyncStatus';
 import { useMetasRegional } from '../hooks/useMetasRegional';
 import { useMetasDistribuida } from '../hooks/useMetasDistribuida';
-import { useVendasDiarias } from '../hooks/useVendasDiarias';
 import { usePortalGatewayUser } from '../hooks/usePortalGatewayUser';
 import { useUserPermissions } from '../hooks/useUserPermissions';
 import { ViewMode, Venda } from '../types/api';
@@ -92,14 +91,9 @@ export function Dashboard() {
   // Query para metas regionais (visão geral - todas as lojas)
   const queryMetasRegional = useMetasRegional(metasParams);
 
-  // Query para metas distribuídas (detalhe da loja selecionada)
+  // Query para metas distribuídas V3.0 (detalhe da loja selecionada)
+  // V3.0: Já inclui histórico + projeção unificados, não precisa mais de useVendasDiarias
   const queryMetasDistribuida = useMetasDistribuida(
-    selectedLoja ? { store_codigo: selectedLoja.codigo, ...metasParams } : null,
-    selectedLoja !== null
-  );
-
-  // Query para histórico de vendas diárias (via cache Redis)
-  const queryVendasDiarias = useVendasDiarias(
     selectedLoja ? { store_codigo: selectedLoja.codigo, ...metasParams } : null,
     selectedLoja !== null
   );
@@ -760,17 +754,16 @@ export function Dashboard() {
               />
             )}
 
-            {/* Visão Detalhe (quando loja selecionada em METAS_LOJA) */}
+            {/* Visão Detalhe V3.0 (quando loja selecionada em METAS_LOJA) */}
             {metasViewMode === 'METAS_LOJA' && selectedLoja && (
               <MetasLojaDetail
                 lojaCodigo={selectedLoja.codigo}
                 lojaNome={selectedLoja.nome}
                 metasDistribuida={queryMetasDistribuida.data}
-                historicoVendas={queryVendasDiarias.data}
                 vendaRealizadaDia={vendasLojaDia}
                 vendaRealizadaAcumulada={vendasLojaAcumuladas}
                 onBack={handleBackToRanking}
-                isLoading={queryMetasDistribuida.isLoading || queryVendasDiarias.isLoading}
+                isLoading={queryMetasDistribuida.isLoading}
               />
             )}
           </>

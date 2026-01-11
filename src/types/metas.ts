@@ -1,14 +1,20 @@
-// Tipos para a API de Metas v2.0
+// Tipos para a API de Metas v3.0 (Unificada)
 
 /**
- * Dia individual da meta distribuída
+ * Dia individual da meta distribuída (V3.0 - Unificada)
  * Usado no endpoint /metas/distribuida
+ *
+ * Contém: Meta + Histórico (passado) + Projeção (hoje/futuro)
+ * - Para dias passados: `venda` é o valor histórico real
+ * - Para hoje: `venda` é a PROJEÇÃO estatística (usar vendaRealizadaDia do realtime)
+ * - Para dias futuros: `venda` é a projeção estatística
  */
 export interface MetaDia {
   dia: number;
   meta_valor: number;
   super_meta_valor?: number;
   peso_aplicado: number;
+  venda: number; // V3.0: Histórico (passado) ou Projeção (hoje/futuro)
 }
 
 /**
@@ -134,14 +140,21 @@ export interface VendasDiariasParams {
 }
 
 /**
- * Dados combinados (Meta + Venda) para renderização
- * Fusão do histórico (cache) com dia atual (realtime)
+ * Tipo de dado por período
+ */
+export type TipoDado = 'historico' | 'realtime' | 'projecao';
+
+/**
+ * Dados combinados (Meta + Venda + Projeção) para renderização V3.0
+ * Fusão inteligente: Histórico (passado) + Realtime (hoje) + Projeção (futuro)
  */
 export interface DadoCombinado {
   dia: number;
   meta_valor: number;
   peso_aplicado: number;
-  venda_realizada: number;
+  venda_realizada: number;    // Valor a usar (histórico, realtime ou projeção)
+  projecao_estatistica: number; // Projeção do backend (para comparativo do dia atual)
   diferenca: number;
-  exibir_venda: boolean; // true se dia <= hoje
+  tipo: TipoDado;             // 'historico' | 'realtime' | 'projecao'
+  exibir_venda: boolean;      // true se dia <= hoje (dados reais disponíveis)
 }

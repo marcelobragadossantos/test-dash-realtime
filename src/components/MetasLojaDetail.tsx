@@ -12,8 +12,8 @@ import {
   TooltipItem
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
-import { ArrowLeft, Calendar, List, Store, Info, Loader2, Target, TrendingUp, Sparkles, Zap } from 'lucide-react';
-import { MetasDistribuidaResponse, MetasViewMode, PacingData, VendasDiariasResponse, DadoCombinado } from '../types/metas';
+import { ArrowLeft, Calendar, List, Store, Info, Loader2, Target, TrendingUp, Sparkles, Zap, Radio } from 'lucide-react';
+import { MetasDistribuidaResponse, MetasViewMode, PacingData, DadoCombinado, TipoDado } from '../types/metas';
 import { MetasPacingCard } from './MetasPacingCard';
 
 // Registrar componentes do Chart.js
@@ -32,28 +32,28 @@ interface MetasLojaDetailProps {
   lojaCodigo: string;
   lojaNome: string;
   metasDistribuida: MetasDistribuidaResponse | undefined;
-  historicoVendas: VendasDiariasResponse | undefined; // Histórico de vendas (cache Redis)
-  vendaRealizadaDia: number;       // Venda exclusiva de HOJE (realtime)
+  vendaRealizadaDia: number;       // Venda exclusiva de HOJE (realtime) - NÃO usar projeção do backend
   vendaRealizadaAcumulada: number; // Venda total do mês até agora (1º até hoje)
   onBack: () => void;
   isLoading?: boolean;
 }
 
 /**
- * Detalhe da loja com gráfico de sazonalidade e switcher calendário/lista
+ * Detalhe da loja com gráfico de sazonalidade e switcher calendário/lista (V3.0)
+ *
  * Exibe duas análises distintas:
- * 1. "Hoje" (Curto Prazo): Meta do Dia vs Venda do Dia
+ * 1. "Hoje" (Curto Prazo): Meta do Dia vs Venda Real vs Projeção Estatística
  * 2. "Ritmo" (Longo Prazo): Meta Acumulada vs Venda Acumulada
  *
- * Fusão de Dados:
- * - Dias passados: Histórico do cache Redis (useVendasDiarias)
- * - Dia atual (hoje): Realtime (vendaRealizadaDia)
+ * Fusão de Dados V3.0:
+ * - Dias passados: d.venda do endpoint /metas/distribuida (histórico)
+ * - Dia atual: vendaRealizadaDia (realtime) - IGNORA projeção do backend
+ * - Dias futuros: d.venda do endpoint /metas/distribuida (projeção estatística)
  */
 export function MetasLojaDetail({
   lojaCodigo,
   lojaNome,
   metasDistribuida,
-  historicoVendas,
   vendaRealizadaDia,
   vendaRealizadaAcumulada,
   onBack,
@@ -65,25 +65,36 @@ export function MetasLojaDetail({
   // A análise de metas é sempre até o dia ATUAL, não muda com a navegação do usuário
   const hoje = new Date().getDate();
 
-  // ===== DATA FUSION: Combina Metas + Histórico + Realtime =====
+  // ===== DATA FUSION V3.0: Combina Histórico + Realtime + Projeção =====
   const dadosCombinados: DadoCombinado[] = useMemo(() => {
     if (!metasDistribuida?.dias) return [];
 
     return metasDistribuida.dias.map(meta => {
       const diaNum = Number(meta.dia);
+      const metaValor = Number(meta.meta_valor) || 0;
+      const vendaBackend = Number(meta.venda) || 0; // V3.0: vem do endpoint unificado
 
-      // Tenta achar venda no histórico (dias passados - via cache Redis)
-      const vendaHistorica = historicoVendas?.dias?.find(v => Number(v.dia) === diaNum);
+      // Lógica de fusão V3.0:
+      // - Passado: usa d.venda (histórico real)
+      // - Hoje: usa vendaRealizadaDia (realtime) - IGNORA projeção do backend
+      // - Futuro: usa d.venda (projeção estatística)
+      let vendaValor: number;
+      let tipo: TipoDado;
 
-      // Se for o dia de HOJE, usa a prop realtime. Se for passado, usa histórico.
-      let vendaValor = 0;
-      if (diaNum === hoje) {
+      if (diaNum < hoje) {
+        // Dias passados: histórico do backend
+        vendaValor = vendaBackend;
+        tipo = 'historico';
+      } else if (diaNum === hoje) {
+        // Hoje: sempre usa realtime (ignora projeção)
         vendaValor = Number(vendaRealizadaDia) || 0;
-      } else if (vendaHistorica) {
-        vendaValor = Number(vendaHistorica.venda_total) || 0;
+        tipo = 'realtime';
+      } else {
+        // Futuro: projeção estatística do backend
+        vendaValor = vendaBackend;
+        tipo = 'projecao';
       }
 
-      const metaValor = Number(meta.meta_valor) || 0;
       const diferenca = vendaValor - metaValor;
 
       return {
@@ -91,24 +102,32 @@ export function MetasLojaDetail({
         meta_valor: metaValor,
         peso_aplicado: Number(meta.peso_aplicado) || 0,
         venda_realizada: vendaValor,
+        projecao_estatistica: vendaBackend, // Sempre guarda a projeção para comparativo
         diferenca,
-        exibir_venda: diaNum <= hoje // Só exibe venda se o dia já passou ou é hoje
+        tipo,
+        exibir_venda: diaNum <= hoje // Só exibe venda real se o dia já passou ou é hoje
       };
     });
-  }, [metasDistribuida, historicoVendas, vendaRealizadaDia, hoje]);
+  }, [metasDistribuida, vendaRealizadaDia, hoje]);
 
   // ===== ANÁLISE 1: Desempenho de HOJE (Curto Prazo) =====
+  // Compara: Meta vs Venda Real vs Projeção Estatística
   const performanceHoje = useMemo(() => {
     if (!metasDistribuida?.dias) return null;
 
     // Encontra a meta específica do dia atual
     const diaAtual = metasDistribuida.dias.find(d => Number(d.dia) === hoje);
     const metaHoje = Number(diaAtual?.meta_valor || 0);
-    const vendaHoje = Number(vendaRealizadaDia) || 0;
+    const projecaoHoje = Number(diaAtual?.venda || 0); // Projeção estatística do backend
+    const vendaHoje = Number(vendaRealizadaDia) || 0;  // Valor REAL (realtime)
     const delta = vendaHoje - metaHoje;
     const percentual = metaHoje > 0 ? (delta / metaHoje) * 100 : 0;
 
-    // Status do dia
+    // Comparação com projeção: estamos acima ou abaixo do esperado estatisticamente?
+    const deltaVsProjecao = vendaHoje - projecaoHoje;
+    const percentualVsProjecao = projecaoHoje > 0 ? (deltaVsProjecao / projecaoHoje) * 100 : 0;
+
+    // Status do dia (baseado na meta)
     let status: 'acima' | 'abaixo' | 'neutro' = 'neutro';
     if (percentual >= 5) {
       status = 'acima';
@@ -118,9 +137,12 @@ export function MetasLojaDetail({
 
     return {
       meta: metaHoje,
-      realizado: vendaHoje,
+      projecao: projecaoHoje,       // V3.0: projeção estatística
+      realizado: vendaHoje,          // Valor real (realtime)
       delta,
       percentual,
+      deltaVsProjecao,               // V3.0: diferença Real vs Projeção
+      percentualVsProjecao,          // V3.0: % Real vs Projeção
       status
     };
   }, [metasDistribuida, vendaRealizadaDia, hoje]);
@@ -446,7 +468,7 @@ export function MetasLojaDetail({
         </div>
       </div>
 
-      {/* ===== CARD DE DESTAQUE: Desempenho de HOJE ===== */}
+      {/* ===== CARD DE DESTAQUE V3.0: Desempenho de HOJE ===== */}
       {performanceHoje && (
         <div className={`rounded-xl p-5 shadow-lg border-2 ${
           performanceHoje.status === 'acima'
@@ -455,26 +477,39 @@ export function MetasLojaDetail({
             ? 'bg-gradient-to-r from-red-50 to-rose-50 border-red-200'
             : 'bg-gradient-to-r from-gray-50 to-slate-50 border-gray-200'
         }`}>
-          <div className="flex items-center gap-2 mb-3">
-            <Zap className={`w-5 h-5 ${
-              performanceHoje.status === 'acima' ? 'text-green-600' :
-              performanceHoje.status === 'abaixo' ? 'text-red-600' : 'text-gray-600'
-            }`} />
-            <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide">
-              Desempenho de Hoje (Dia {hoje})
-            </h3>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Zap className={`w-5 h-5 ${
+                performanceHoje.status === 'acima' ? 'text-green-600' :
+                performanceHoje.status === 'abaixo' ? 'text-red-600' : 'text-gray-600'
+              }`} />
+              <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide">
+                Desempenho de Hoje (Dia {hoje})
+              </h3>
+            </div>
+            {/* Badge LIVE - indica dado em tempo real */}
+            <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-500 text-white text-[10px] font-bold rounded-full animate-pulse">
+              <Radio className="w-3 h-3" />
+              LIVE
+            </span>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-4 gap-3">
             {/* Meta do Dia */}
             <div className="text-center">
-              <p className="text-xs text-gray-500 mb-1">Meta do Dia</p>
+              <p className="text-xs text-gray-500 mb-1">Meta</p>
               <p className="text-lg font-bold text-gray-800">{formatCurrency(performanceHoje.meta)}</p>
             </div>
 
-            {/* Venda do Dia */}
+            {/* Projeção Estatística (V3.0) */}
             <div className="text-center">
-              <p className="text-xs text-gray-500 mb-1">Venda do Dia</p>
+              <p className="text-xs text-gray-500 mb-1">Projeção</p>
+              <p className="text-lg font-bold text-purple-600">{formatCurrency(performanceHoje.projecao)}</p>
+            </div>
+
+            {/* Venda Real do Dia */}
+            <div className="text-center">
+              <p className="text-xs text-gray-500 mb-1">Real</p>
               <p className={`text-lg font-bold ${
                 performanceHoje.status === 'acima' ? 'text-green-600' :
                 performanceHoje.status === 'abaixo' ? 'text-red-600' : 'text-gray-800'
@@ -483,9 +518,9 @@ export function MetasLojaDetail({
               </p>
             </div>
 
-            {/* Delta / Status */}
+            {/* Delta vs Meta */}
             <div className="text-center">
-              <p className="text-xs text-gray-500 mb-1">Diferença</p>
+              <p className="text-xs text-gray-500 mb-1">vs Meta</p>
               <div className="flex items-center justify-center gap-1">
                 <p className={`text-lg font-bold ${
                   performanceHoje.delta >= 0 ? 'text-green-600' : 'text-red-600'
@@ -498,6 +533,19 @@ export function MetasLojaDetail({
                 performanceHoje.status === 'abaixo' ? 'text-red-600' : 'text-gray-500'
               }`}>
                 ({performanceHoje.percentual >= 0 ? '+' : ''}{performanceHoje.percentual.toFixed(1)}%)
+              </span>
+            </div>
+          </div>
+
+          {/* Comparativo Real vs Projeção (V3.0) */}
+          <div className="mt-3 pt-3 border-t border-gray-200">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-gray-500">Real vs Projeção:</span>
+              <span className={`font-semibold ${
+                performanceHoje.deltaVsProjecao >= 0 ? 'text-green-600' : 'text-red-600'
+              }`}>
+                {performanceHoje.deltaVsProjecao >= 0 ? '+' : ''}{formatCurrency(performanceHoje.deltaVsProjecao)}
+                {' '}({performanceHoje.percentualVsProjecao >= 0 ? '+' : ''}{performanceHoje.percentualVsProjecao.toFixed(1)}%)
               </span>
             </div>
           </div>
@@ -625,8 +673,19 @@ export function MetasLojaDetail({
                             {dado.dia}
                           </span>
                           {isHoje && (
-                            <span className="px-1.5 py-0.5 bg-primary-100 text-primary-700 text-[10px] font-medium rounded">
-                              HOJE
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded animate-pulse">
+                              <Radio className="w-2.5 h-2.5" />
+                              LIVE
+                            </span>
+                          )}
+                          {dado.tipo === 'historico' && (
+                            <span className="px-1.5 py-0.5 bg-gray-100 text-gray-500 text-[10px] font-medium rounded">
+                              Histórico
+                            </span>
+                          )}
+                          {dado.tipo === 'projecao' && (
+                            <span className="px-1.5 py-0.5 bg-purple-100 text-purple-600 text-[10px] font-medium rounded">
+                              Projeção
                             </span>
                           )}
                         </div>
