@@ -59,7 +59,7 @@ export function MetasLojaDetail({
   onBack,
   isLoading
 }: MetasLojaDetailProps) {
-  const [viewMode, setViewMode] = useState<MetasViewMode>('calendario');
+  const [viewMode, setViewMode] = useState<MetasViewMode>('lista'); // Padrão: tabela
 
   // SEMPRE usa a data atual do sistema (independente da data que o usuário está visualizando)
   // A análise de metas é sempre até o dia ATUAL, não muda com a navegação do usuário
@@ -236,7 +236,7 @@ export function MetasLojaDetail({
     };
   }, [metasDistribuida, hoje]);
 
-  // Dados do gráfico usando dados combinados reais
+  // Dados do gráfico usando dados combinados reais + projeção
   const chartData = useMemo(() => {
     // Proteção contra crash - verifica se dados existem
     if (!metasDistribuida?.dias || metasDistribuida.dias.length === 0) {
@@ -252,12 +252,20 @@ export function MetasLojaDetail({
       return acumuladoMeta;
     });
 
-    // Vendas reais acumuladas - usando dados combinados (histórico + realtime)
+    // Vendas reais acumuladas (histórico + realtime até hoje)
     let acumuladoVendas = 0;
-    const vendasAcumuladas = dadosCombinados.map(d => {
-      if (!d.exibir_venda) return null; // Dias futuros não têm dados
+    const vendasReaisAcumuladas = dadosCombinados.map(d => {
+      if (d.tipo === 'projecao') return null; // Para em hoje
       acumuladoVendas += d.venda_realizada;
       return acumuladoVendas;
+    });
+
+    // Projeção acumulada (começa de hoje e vai até o fim do mês)
+    let acumuladoProjecao = 0;
+    const projecaoAcumulada = dadosCombinados.map(d => {
+      acumuladoProjecao += d.venda_realizada; // Usa venda_realizada que já tem a fusão
+      if (d.dia < hoje) return null; // Só mostra a partir de hoje
+      return acumuladoProjecao;
     });
 
     return {
@@ -275,8 +283,8 @@ export function MetasLojaDetail({
           fill: false,
         },
         {
-          label: 'Vendas Acumuladas (Real)',
-          data: vendasAcumuladas,
+          label: 'Realizado (Histórico + Hoje)',
+          data: vendasReaisAcumuladas,
           borderColor: 'rgb(34, 197, 94)',
           backgroundColor: 'rgba(34, 197, 94, 0.1)',
           borderWidth: 3,
@@ -285,9 +293,21 @@ export function MetasLojaDetail({
           fill: true,
           spanGaps: false,
         },
+        {
+          label: 'Projeção (Futuro)',
+          data: projecaoAcumulada,
+          borderColor: 'rgb(147, 51, 234)',
+          backgroundColor: 'rgba(147, 51, 234, 0.1)',
+          borderDash: [3, 3],
+          borderWidth: 2,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          fill: false,
+          spanGaps: true,
+        },
       ],
     };
-  }, [metasDistribuida, dadosCombinados]);
+  }, [metasDistribuida, dadosCombinados, hoje]);
 
   const chartOptions = {
     responsive: true,
@@ -470,7 +490,7 @@ export function MetasLojaDetail({
 
       {/* ===== CARD DE DESTAQUE V3.0: Desempenho de HOJE ===== */}
       {performanceHoje && (
-        <div className={`rounded-xl p-5 shadow-lg border-2 ${
+        <div className={`rounded-xl p-4 sm:p-5 shadow-lg border-2 ${
           performanceHoje.status === 'acima'
             ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-200'
             : performanceHoje.status === 'abaixo'
@@ -479,38 +499,33 @@ export function MetasLojaDetail({
         }`}>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <Zap className={`w-5 h-5 ${
+              <Zap className={`w-4 h-4 sm:w-5 sm:h-5 ${
                 performanceHoje.status === 'acima' ? 'text-green-600' :
                 performanceHoje.status === 'abaixo' ? 'text-red-600' : 'text-gray-600'
               }`} />
-              <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide">
-                Desempenho de Hoje (Dia {hoje})
+              <h3 className="text-xs sm:text-sm font-bold text-gray-700 uppercase tracking-wide">
+                Hoje (Dia {hoje})
               </h3>
             </div>
             {/* Badge LIVE - indica dado em tempo real */}
-            <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-500 text-white text-[10px] font-bold rounded-full animate-pulse">
-              <Radio className="w-3 h-3" />
+            <span className="inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 sm:py-1 bg-red-500 text-white text-[9px] sm:text-[10px] font-bold rounded-full animate-pulse">
+              <Radio className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
               LIVE
             </span>
           </div>
 
-          <div className="grid grid-cols-4 gap-3">
+          {/* Grid responsivo: 2 colunas no mobile, 4 no desktop */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
             {/* Meta do Dia */}
-            <div className="text-center">
-              <p className="text-xs text-gray-500 mb-1">Meta</p>
-              <p className="text-lg font-bold text-gray-800">{formatCurrency(performanceHoje.meta)}</p>
-            </div>
-
-            {/* Projeção Estatística (V3.0) */}
-            <div className="text-center">
-              <p className="text-xs text-gray-500 mb-1">Projeção</p>
-              <p className="text-lg font-bold text-purple-600">{formatCurrency(performanceHoje.projecao)}</p>
+            <div className="text-center p-2 bg-white/50 rounded-lg">
+              <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5">Meta</p>
+              <p className="text-sm sm:text-lg font-bold text-gray-800">{formatCurrency(performanceHoje.meta)}</p>
             </div>
 
             {/* Venda Real do Dia */}
-            <div className="text-center">
-              <p className="text-xs text-gray-500 mb-1">Real</p>
-              <p className={`text-lg font-bold ${
+            <div className="text-center p-2 bg-white/50 rounded-lg">
+              <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5">Real</p>
+              <p className={`text-sm sm:text-lg font-bold ${
                 performanceHoje.status === 'acima' ? 'text-green-600' :
                 performanceHoje.status === 'abaixo' ? 'text-red-600' : 'text-gray-800'
               }`}>
@@ -519,33 +534,28 @@ export function MetasLojaDetail({
             </div>
 
             {/* Delta vs Meta */}
-            <div className="text-center">
-              <p className="text-xs text-gray-500 mb-1">vs Meta</p>
-              <div className="flex items-center justify-center gap-1">
-                <p className={`text-lg font-bold ${
-                  performanceHoje.delta >= 0 ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  {performanceHoje.delta >= 0 ? '+' : ''}{formatCurrency(performanceHoje.delta)}
-                </p>
-              </div>
-              <span className={`text-xs font-medium ${
-                performanceHoje.status === 'acima' ? 'text-green-600' :
-                performanceHoje.status === 'abaixo' ? 'text-red-600' : 'text-gray-500'
+            <div className="text-center p-2 bg-white/50 rounded-lg">
+              <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5">vs Meta</p>
+              <p className={`text-sm sm:text-lg font-bold ${
+                performanceHoje.delta >= 0 ? 'text-green-600' : 'text-red-600'
+              }`}>
+                {performanceHoje.delta >= 0 ? '+' : ''}{formatCurrency(performanceHoje.delta)}
+              </p>
+              <span className={`text-[9px] sm:text-xs font-medium ${
+                performanceHoje.delta >= 0 ? 'text-green-600' : 'text-red-600'
               }`}>
                 ({performanceHoje.percentual >= 0 ? '+' : ''}{performanceHoje.percentual.toFixed(1)}%)
               </span>
             </div>
-          </div>
 
-          {/* Comparativo Real vs Projeção (V3.0) */}
-          <div className="mt-3 pt-3 border-t border-gray-200">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-gray-500">Real vs Projeção:</span>
-              <span className={`font-semibold ${
+            {/* Projeção */}
+            <div className="text-center p-2 bg-white/50 rounded-lg">
+              <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5">Projeção</p>
+              <p className="text-sm sm:text-lg font-bold text-purple-600">{formatCurrency(performanceHoje.projecao)}</p>
+              <span className={`text-[9px] sm:text-xs font-medium ${
                 performanceHoje.deltaVsProjecao >= 0 ? 'text-green-600' : 'text-red-600'
               }`}>
-                {performanceHoje.deltaVsProjecao >= 0 ? '+' : ''}{formatCurrency(performanceHoje.deltaVsProjecao)}
-                {' '}({performanceHoje.percentualVsProjecao >= 0 ? '+' : ''}{performanceHoje.percentualVsProjecao.toFixed(1)}%)
+                ({performanceHoje.percentualVsProjecao >= 0 ? '+' : ''}{performanceHoje.percentualVsProjecao.toFixed(1)}%)
               </span>
             </div>
           </div>
@@ -696,26 +706,22 @@ export function MetasLojaDetail({
                         </span>
                       </td>
                       <td className="px-3 py-3 text-right">
-                        {dado.exibir_venda ? (
-                          <span className={`font-medium ${
-                            dado.diferenca >= 0 ? 'text-green-600' : 'text-red-600'
-                          }`}>
-                            {formatCurrency(dado.venda_realizada)}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                        <span className={`font-medium ${
+                          dado.tipo === 'projecao'
+                            ? 'text-purple-600'
+                            : dado.diferenca >= 0 ? 'text-green-600' : 'text-red-600'
+                        }`}>
+                          {formatCurrency(dado.venda_realizada)}
+                        </span>
                       </td>
                       <td className="px-3 py-3 text-right">
-                        {dado.exibir_venda ? (
-                          <span className={`font-medium ${
-                            dado.diferenca >= 0 ? 'text-green-600' : 'text-red-600'
-                          }`}>
-                            {dado.diferenca >= 0 ? '+' : ''}{formatCurrency(dado.diferenca)}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                        <span className={`font-medium ${
+                          dado.tipo === 'projecao'
+                            ? 'text-purple-600'
+                            : dado.diferenca >= 0 ? 'text-green-600' : 'text-red-600'
+                        }`}>
+                          {dado.diferenca >= 0 ? '+' : ''}{formatCurrency(dado.diferenca)}
+                        </span>
                       </td>
                       <td className="px-3 py-3 text-right">
                         <span className={`text-sm ${
