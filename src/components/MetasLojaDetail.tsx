@@ -35,6 +35,7 @@ interface MetasLojaDetailProps {
   historicoVendas: VendasDiariasResponse | undefined; // Histórico de vendas (cache Redis)
   vendaRealizadaDia: number;       // Venda exclusiva de HOJE (realtime)
   vendaRealizadaAcumulada: number; // Venda total do mês até agora (1º até hoje)
+  dataVisualizacao: Date;          // Data que o usuário está visualizando
   onBack: () => void;
   isLoading?: boolean;
 }
@@ -56,11 +57,14 @@ export function MetasLojaDetail({
   historicoVendas,
   vendaRealizadaDia,
   vendaRealizadaAcumulada,
+  dataVisualizacao,
   onBack,
   isLoading
 }: MetasLojaDetailProps) {
   const [viewMode, setViewMode] = useState<MetasViewMode>('calendario');
-  const hoje = new Date().getDate();
+
+  // Usa a data de visualização passada pelo Dashboard (não a data do sistema)
+  const hoje = dataVisualizacao.getDate();
 
   // ===== DATA FUSION: Combina Metas + Histórico + Realtime =====
   const dadosCombinados: DadoCombinado[] = useMemo(() => {
@@ -298,6 +302,19 @@ export function MetasLojaDetail({
     },
   };
 
+  // Calcula totais para o footer da tabela (DEVE ficar ANTES dos early returns)
+  const totais = useMemo(() => {
+    const totalMeta = dadosCombinados.reduce((acc, d) => acc + d.meta_valor, 0);
+    const totalRealizado = dadosCombinados
+      .filter(d => d.exibir_venda)
+      .reduce((acc, d) => acc + d.venda_realizada, 0);
+    const totalDiferenca = totalRealizado - dadosCombinados
+      .filter(d => d.exibir_venda)
+      .reduce((acc, d) => acc + d.meta_valor, 0);
+
+    return { totalMeta, totalRealizado, totalDiferenca };
+  }, [dadosCombinados]);
+
   const formatCurrency = (value: number | string | undefined | null) => {
     const numValue = Number(value) || 0;
     return new Intl.NumberFormat('pt-BR', {
@@ -371,19 +388,6 @@ export function MetasLojaDetail({
       </div>
     );
   }
-
-  // Calcula totais para o footer da tabela
-  const totais = useMemo(() => {
-    const totalMeta = dadosCombinados.reduce((acc, d) => acc + d.meta_valor, 0);
-    const totalRealizado = dadosCombinados
-      .filter(d => d.exibir_venda)
-      .reduce((acc, d) => acc + d.venda_realizada, 0);
-    const totalDiferenca = totalRealizado - dadosCombinados
-      .filter(d => d.exibir_venda)
-      .reduce((acc, d) => acc + d.meta_valor, 0);
-
-    return { totalMeta, totalRealizado, totalDiferenca };
-  }, [dadosCombinados]);
 
   return (
     <div className="space-y-6">
